@@ -1,0 +1,16 @@
+node_modules/
+backend/node_modules/
+frontend/node_modules/
+desktop/node_modules/
+.env
+backend/.env
+frontend/.env
+.desktop
+.DS_Store
+backend/uploads/screenshots/
+backend/uploads/.gitkeep
+.desktop
+*.log
+desktop/dist/
+frontend/dist/
+.desktop

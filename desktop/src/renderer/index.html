@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>WebWork Tracker</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main id="app">
+      <section id="auth">
+        <h1>WebWork Tracker</h1>
+        <p class="subtitle">Log in with your WebWork credentials to begin tracking.</p>
+        <form id="login-form">
+          <label>Email <input type="email" id="email" required /></label>
+          <label>Password <input type="password" id="password" required /></label>
+          <button type="submit">Sign in</button>
+        </form>
+        <p id="auth-error" class="error hidden"></p>
+      </section>
+
+      <section id="tracker" class="hidden">
+        <header>
+          <div>
+            <h2 id="user-name"></h2>
+            <p id="user-role"></p>
+          </div>
+          <button id="logout">Sign out</button>
+        </header>
+
+        <div class="status-card">
+          <p class="label">Current status</p>
+          <p id="status" class="value">Idle</p>
+          <p id="status-note" class="note"></p>
+        </div>
+
+        <div class="attendance-card">
+          <div class="attendance-info">
+            <p class="label">Attendance</p>
+            <p id="attendance-state" class="value">Not clocked in</p>
+            <p id="attendance-note" class="note"></p>
+          </div>
+            <button id="clock-toggle" class="secondary">Clock In</button>
+        </div>
+
+        <div class="control-group">
+          <label for="task-select">Select task</label>
+          <select id="task-select"></select>
+        </div>
+
+        <div class="buttons">
+          <button id="start" class="primary">Start</button>
+          <button id="pause">Pause</button>
+          <button id="resume">Resume</button>
+          <button id="stop" class="danger">Stop</button>
+        </div>
+
+        <div class="log" id="event-log"></div>
+      </section>
+    </main>
+    <script src="renderer.js"></script>
+  </body>
+</html>

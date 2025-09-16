@@ -1,0 +1,74 @@
+import { Navigate, Route, Routes } from 'react-router-dom';
+import Loader from './components/Loader.jsx';
+import LoginPage from './pages/LoginPage.jsx';
+import DashboardPage from './pages/DashboardPage.jsx';
+import ProjectsPage from './pages/ProjectsPage.jsx';
+import TeamsPage from './pages/TeamsPage.jsx';
+import TimesheetPage from './pages/TimesheetPage.jsx';
+import AgentsPage from './pages/AgentsPage.jsx';
+import AgentDetailPage from './pages/AgentDetailPage.jsx';
+import { useAuth } from './context/AuthContext.jsx';
+
+const ProtectedRoute = ({ children }) => {
+  const { user, loading } = useAuth();
+  if (loading) return <Loader message="Checking session" />;
+  if (!user) return <Navigate to="/login" replace />;
+  return children;
+};
+
+const App = () => (
+  <Routes>
+    <Route path="/login" element={<LoginPage />} />
+    <Route
+      path="/"
+      element={
+        <ProtectedRoute>
+          <DashboardPage />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/teams"
+      element={
+        <ProtectedRoute>
+          <TeamsPage />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/projects"
+      element={
+        <ProtectedRoute>
+          <ProjectsPage />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/agents"
+      element={
+        <ProtectedRoute>
+          <AgentsPage />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/agents/:id"
+      element={
+        <ProtectedRoute>
+          <AgentDetailPage />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/timesheets"
+      element={
+        <ProtectedRoute>
+          <TimesheetPage />
+        </ProtectedRoute>
+      }
+    />
+    <Route path="*" element={<Navigate to="/" replace />} />
+  </Routes>
+);
+
+export default App;
