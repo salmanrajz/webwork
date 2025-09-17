@@ -32,10 +32,10 @@ const setStatus = (text, note = '') => {
   statusNote.textContent = note;
 };
 
-const isProduction = process.env.NODE_ENV === 'production';
+const shouldShowLog = process.env.WEBWORK_SILENCE_LOGS !== 'true';
 
 const logEvent = (message) => {
-  if (isProduction) return;
+  if (!shouldShowLog) return;
   const entry = document.createElement('div');
   entry.className = 'log-entry';
   const timeEl = document.createElement('time');

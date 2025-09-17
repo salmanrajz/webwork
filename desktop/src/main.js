@@ -1,5 +1,6 @@
 const { app, BrowserWindow, ipcMain, powerMonitor } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const axios = require('axios');
 const FormData = require('form-data');
 const screenshotDesktop = require('screenshot-desktop');
@@ -16,17 +17,25 @@ try {
   console.warn('Input hooks disabled:', error.message);
 }
 
-const isProduction = app.isPackaged;
+const silenceLogs =
+  app.isPackaged && (process.env.WEBWORK_SILENCE_LOGS || '').toLowerCase() !== 'false';
 
-if (isProduction) {
+if (silenceLogs) {
   console.log = () => {};
   console.warn = () => {};
   console.error = () => {};
   app.commandLine.appendSwitch('disable-logging');
 }
 
-const envPath = path.join(__dirname, '..', '.env');
-dotenv.config({ path: envPath, override: true });
+const developmentEnvPath = path.join(__dirname, '..', '.env');
+const productionEnvPath = path.join(process.resourcesPath, '.env');
+if (!process.env.API_BASE_URL) {
+  if (app.isPackaged && fs.existsSync(productionEnvPath)) {
+    dotenv.config({ path: productionEnvPath, override: true });
+  } else if (fs.existsSync(developmentEnvPath)) {
+    dotenv.config({ path: developmentEnvPath, override: true });
+  }
+}
 
 const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:4000/api';
 const SCREENSHOT_INTERVAL_MS = Math.max(
