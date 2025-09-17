@@ -38,6 +38,21 @@ User.init(
     isActive: {
       type: DataTypes.BOOLEAN,
       defaultValue: true
+    },
+    breakReminderInterval: {
+      type: DataTypes.INTEGER,
+      defaultValue: 60,
+      comment: 'Break reminder interval in minutes'
+    },
+    breakReminderEnabled: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: true,
+      comment: 'Whether break reminders are enabled'
+    },
+    dailyTargetHours: {
+      type: DataTypes.INTEGER,
+      defaultValue: 8,
+      comment: 'Daily target hours for productivity tracking'
     }
   },
   {

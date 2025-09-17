@@ -2,11 +2,16 @@
   "name": "webwork-tracker",
   "version": "1.0.0",
   "description": "Desktop time tracker for WebWork SaaS",
-  "author": "Your Company",
+  "author": "WebWork Team",
   "main": "src/main.js",
+  "homepage": "./",
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder"
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win",
+    "dist:win-portable": "electron-builder --win portable",
+    "dist:win-nsis": "electron-builder --win nsis",
+    "build": "electron-builder --publish=never"
   },
   "dependencies": {
     "active-win": "^8.1.0",

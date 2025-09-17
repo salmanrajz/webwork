@@ -12,6 +12,7 @@ import UserFormPage from './pages/UserFormPage.jsx';
 import TasksPage from './pages/TasksPage.jsx';
 import AssignTasksPage from './pages/AssignTasksPage.jsx';
 import { useAuth } from './context/AuthContext.jsx';
+import { ThemeProvider } from './context/ThemeContext.jsx';
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -21,98 +22,100 @@ const ProtectedRoute = ({ children }) => {
 };
 
 const App = () => (
-  <Routes>
-    <Route path="/login" element={<LoginPage />} />
-    <Route
-      path="/"
-      element={
-        <ProtectedRoute>
-          <DashboardPage />
-        </ProtectedRoute>
-      }
-    />
-    <Route
-      path="/teams"
-      element={
-        <ProtectedRoute>
-          <TeamsPage />
-        </ProtectedRoute>
-      }
-    />
-    <Route
-      path="/projects"
-      element={
-        <ProtectedRoute>
-          <ProjectsPage />
-        </ProtectedRoute>
-      }
-    />
-    <Route
-      path="/agents"
-      element={
-        <ProtectedRoute>
-          <AgentsPage />
-        </ProtectedRoute>
-      }
-    />
-    <Route
-      path="/agents/:id"
-      element={
-        <ProtectedRoute>
-          <AgentDetailPage />
-        </ProtectedRoute>
-      }
-    />
-    <Route
-      path="/users"
-      element={
-        <ProtectedRoute>
-          <UsersPage />
-        </ProtectedRoute>
-      }
-    />
-    <Route
-      path="/users/new"
-      element={
-        <ProtectedRoute>
-          <UserFormPage />
-        </ProtectedRoute>
-      }
-    />
-    <Route
-      path="/users/:id/edit"
-      element={
-        <ProtectedRoute>
-          <UserFormPage />
-        </ProtectedRoute>
-      }
-    />
-    <Route
-      path="/tasks"
-      element={
-        <ProtectedRoute>
-          <TasksPage />
-        </ProtectedRoute>
-      }
-    />
-    <Route
-      path="/tasks/assign"
-      element={
-        <ProtectedRoute>
-          <AssignTasksPage />
-        </ProtectedRoute>
-      }
-    />
-    <Route
-      path="/timesheets"
-      element={
-        <ProtectedRoute>
-          <TimesheetPage />
-        </ProtectedRoute>
-      }
-    />
-    <Route path="*" element={<Navigate to="/" replace />} />
-  </Routes>
+  <ThemeProvider>
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route
+        path="/"
+        element={
+          <ProtectedRoute>
+            <DashboardPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/teams"
+        element={
+          <ProtectedRoute>
+            <TeamsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/projects"
+        element={
+          <ProtectedRoute>
+            <ProjectsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/agents"
+        element={
+          <ProtectedRoute>
+            <AgentsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/agents/:id"
+        element={
+          <ProtectedRoute>
+            <AgentDetailPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/users"
+        element={
+          <ProtectedRoute>
+            <UsersPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/users/new"
+        element={
+          <ProtectedRoute>
+            <UserFormPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/users/:id/edit"
+        element={
+          <ProtectedRoute>
+            <UserFormPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/tasks"
+        element={
+          <ProtectedRoute>
+            <TasksPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/tasks/assign"
+        element={
+          <ProtectedRoute>
+            <AssignTasksPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/timesheets"
+        element={
+          <ProtectedRoute>
+            <TimesheetPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  </ThemeProvider>
 );
 
 export default App;

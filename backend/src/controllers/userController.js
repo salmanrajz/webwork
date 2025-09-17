@@ -51,6 +51,38 @@ export const removeUser = async (req, res) => {
   res.status(204).send();
 };
 
+// Break time settings endpoints
+export const getBreakSettings = async (req, res) => {
+  const user = await getUserById(req.user.id);
+  res.json({
+    success: true,
+    data: {
+      breakReminderInterval: user.breakReminderInterval,
+      breakReminderEnabled: user.breakReminderEnabled,
+      dailyTargetHours: user.dailyTargetHours
+    }
+  });
+};
+
+export const updateBreakSettings = async (req, res) => {
+  const { breakReminderInterval, breakReminderEnabled, dailyTargetHours } = req.body;
+  
+  const updateData = {};
+  if (breakReminderInterval !== undefined) updateData.breakReminderInterval = breakReminderInterval;
+  if (breakReminderEnabled !== undefined) updateData.breakReminderEnabled = breakReminderEnabled;
+  if (dailyTargetHours !== undefined) updateData.dailyTargetHours = dailyTargetHours;
+  
+  const user = await updateUser(req.user.id, updateData);
+  res.json({
+    success: true,
+    data: {
+      breakReminderInterval: user.breakReminderInterval,
+      breakReminderEnabled: user.breakReminderEnabled,
+      dailyTargetHours: user.dailyTargetHours
+    }
+  });
+};
+
 export const getProfile = async (req, res) => {
   const user = await getUserById(req.user.id);
   res.json({ success: true, data: user });

@@ -6,7 +6,9 @@ import {
   postUser,
   removeUser,
   updateProfile,
-  patchUser
+  patchUser,
+  getBreakSettings,
+  updateBreakSettings
 } from '../controllers/userController.js';
 import { authenticate } from '../middleware/authMiddleware.js';
 
@@ -16,6 +18,10 @@ router.use(authenticate);
 
 router.get('/me', getProfile);
 router.patch('/me', updateProfile);
+
+// Break settings endpoints
+router.get('/me/break-settings', getBreakSettings);
+router.patch('/me/break-settings', updateBreakSettings);
 
 router.get('/', getUsers);
 router.post('/', postUser);
