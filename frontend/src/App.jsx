@@ -9,6 +9,8 @@ import AgentsPage from './pages/AgentsPage.jsx';
 import AgentDetailPage from './pages/AgentDetailPage.jsx';
 import UsersPage from './pages/UsersPage.jsx';
 import UserFormPage from './pages/UserFormPage.jsx';
+import TasksPage from './pages/TasksPage.jsx';
+import AssignTasksPage from './pages/AssignTasksPage.jsx';
 import { useAuth } from './context/AuthContext.jsx';
 
 const ProtectedRoute = ({ children }) => {
@@ -82,6 +84,22 @@ const App = () => (
       element={
         <ProtectedRoute>
           <UserFormPage />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/tasks"
+      element={
+        <ProtectedRoute>
+          <TasksPage />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/tasks/assign"
+      element={
+        <ProtectedRoute>
+          <AssignTasksPage />
         </ProtectedRoute>
       }
     />
