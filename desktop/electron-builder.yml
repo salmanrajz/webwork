@@ -19,7 +19,7 @@ nsis:
   createDesktopShortcut: true
   createStartMenuShortcut: true
   installerLanguages:
-    - 1033
+    - en_US
 portable:
   artifactName: "${productName} Portable-${version}.${ext}"
 extraResources:

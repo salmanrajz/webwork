@@ -11,10 +11,15 @@ const Sidebar = () => {
     { path: '/timesheets', label: 'Timesheets', icon: '⏱️' }
   ];
 
-  const navItems =
-    user && user.role !== 'employee'
-      ? [...baseItems.slice(0, 1), { path: '/agents', label: 'Agents', icon: '🧑‍💻' }, ...baseItems.slice(1)]
-      : baseItems;
+  let navItems = baseItems;
+  if (user && user.role !== 'employee') {
+    navItems = [
+      baseItems[0],
+      { path: '/agents', label: 'Agents', icon: '🧑‍💻' },
+      ...(user.role === 'admin' ? [{ path: '/users', label: 'Users', icon: '🧑‍⚖️' }] : []),
+      ...baseItems.slice(1)
+    ];
+  }
 
   return (
     <aside className="flex h-full w-64 flex-col bg-white shadow-sm">

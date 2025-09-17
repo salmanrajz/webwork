@@ -16,6 +16,15 @@ try {
   console.warn('Input hooks disabled:', error.message);
 }
 
+const isProduction = app.isPackaged;
+
+if (isProduction) {
+  console.log = () => {};
+  console.warn = () => {};
+  console.error = () => {};
+  app.commandLine.appendSwitch('disable-logging');
+}
+
 const envPath = path.join(__dirname, '..', '.env');
 dotenv.config({ path: envPath, override: true });
 

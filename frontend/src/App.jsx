@@ -7,6 +7,8 @@ import TeamsPage from './pages/TeamsPage.jsx';
 import TimesheetPage from './pages/TimesheetPage.jsx';
 import AgentsPage from './pages/AgentsPage.jsx';
 import AgentDetailPage from './pages/AgentDetailPage.jsx';
+import UsersPage from './pages/UsersPage.jsx';
+import UserFormPage from './pages/UserFormPage.jsx';
 import { useAuth } from './context/AuthContext.jsx';
 
 const ProtectedRoute = ({ children }) => {
@@ -56,6 +58,30 @@ const App = () => (
       element={
         <ProtectedRoute>
           <AgentDetailPage />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/users"
+      element={
+        <ProtectedRoute>
+          <UsersPage />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/users/new"
+      element={
+        <ProtectedRoute>
+          <UserFormPage />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/users/:id/edit"
+      element={
+        <ProtectedRoute>
+          <UserFormPage />
         </ProtectedRoute>
       }
     />

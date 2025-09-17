@@ -45,6 +45,17 @@ export const userApi = {
   async get(id) {
     const { data } = await api.get(`/users/${id}`);
     return data.data;
+  },
+  async create(payload) {
+    const { data } = await api.post('/users', payload);
+    return data.data;
+  },
+  async update(id, payload) {
+    const { data } = await api.patch(`/users/${id}`, payload);
+    return data.data;
+  },
+  async remove(id) {
+    await api.delete(`/users/${id}`);
   }
 };
 
