@@ -1,9 +1,14 @@
-const { app, BrowserWindow, ipcMain, powerMonitor } = require('electron');
+console.log('🔧 Starting WebWork Tracker Desktop App...');
+
+// Import Electron modules
+const { app, BrowserWindow, ipcMain, powerMonitor, Tray, Menu } = require('electron');
+console.log('✅ Electron modules imported successfully');
 const path = require('path');
 const axios = require('axios');
 const FormData = require('form-data');
 const screenshotDesktop = require('screenshot-desktop');
 const dotenv = require('dotenv');
+const WebSocket = require('ws');
 const si = require('systeminformation');
 let activeWinModule;
 let uIOhook;
@@ -22,13 +27,17 @@ if (isProduction) {
   console.log = () => {};
   console.warn = () => {};
   console.error = () => {};
-  app.commandLine.appendSwitch('disable-logging');
+  if (app && app.commandLine) {
+    app.commandLine.appendSwitch('disable-logging');
+  }
 }
 
 const envPath = path.join(__dirname, '..', '.env');
 dotenv.config({ path: envPath, override: true });
 
+// Environment Configuration with Production Support
 const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:4000/api';
+const WEBSOCKET_URL = process.env.WEBSOCKET_URL || 'ws://localhost:4000/realtime';
 const SCREENSHOT_INTERVAL_MS = Math.max(
   Number(process.env.SCREENSHOT_INTERVAL_MINUTES || 5) * 60 * 1000,
   60000
@@ -37,8 +46,24 @@ const ACTIVITY_INTERVAL_MS = Math.max(
   Number(process.env.ACTIVITY_INTERVAL_SECONDS || 15) * 1000,
   5000
 );
+const REALTIME_INTERVAL_MS = Math.max(
+  Number(process.env.REALTIME_INTERVAL_SECONDS || 5) * 1000,
+  2000
+);
+
+// Feature Flags
+const ENHANCED_BROWSER_DETECTION = process.env.ENHANCED_BROWSER_DETECTION !== 'false';
+const APPLESCRIPT_ENABLED = process.env.APPLESCRIPT_ENABLED !== 'false';
+const REALTIME_ENABLED = process.env.REALTIME_ENABLED !== 'false';
+const ENABLE_CONSOLE_LOGS = process.env.ENABLE_CONSOLE_LOGS !== 'false';
+
+// macOS Permissions
+const MACOS_ACCESSIBILITY_REQUIRED = process.env.MACOS_ACCESSIBILITY_REQUIRED !== 'false';
+const MACOS_SCREEN_RECORDING_REQUIRED = process.env.MACOS_SCREEN_RECORDING_REQUIRED !== 'false';
+const MACOS_AUTOMATION_REQUIRED = process.env.MACOS_AUTOMATION_REQUIRED !== 'false';
 
 let mainWindow = null;
+let tray = null;
 let captureTimer = null;
 let captureContext = null;
 let activityTimer = null;
@@ -53,6 +78,11 @@ let mouseUpHandler;
 let wheelHandler;
 const KEYSTROKE_LIMIT = 200;
 
+// Real-time monitoring
+let websocket = null;
+let realtimeTimer = null;
+let lastActivityData = null;
+
 const api = axios.create({ baseURL: API_BASE_URL });
 
 const withAuth = (token) =>
@@ -65,6 +95,187 @@ const sendStatus = (payload) => {
   if (mainWindow) {
     mainWindow.webContents.send('tracker:status', payload);
   }
+};
+
+// Real-time monitoring functions
+const connectWebSocket = (token) => {
+  if (!REALTIME_ENABLED) {
+    if (ENABLE_CONSOLE_LOGS) {
+      console.log('📡 Real-time monitoring disabled via environment');
+    }
+    return;
+  }
+  
+  // Don't connect if no token or token is too short
+  if (!token || token.length < 10) {
+    if (ENABLE_CONSOLE_LOGS) {
+      console.warn('⚠️ Cannot connect to WebSocket: Invalid or missing token');
+    }
+    return;
+  }
+  
+  if (ENABLE_CONSOLE_LOGS) {
+    console.log('🔗 Attempting WebSocket connection with token:', token ? 'Present' : 'Missing');
+    console.log('🔗 Token length:', token ? token.length : 0);
+    console.log('🔗 Token preview:', token ? token.substring(0, 20) + '...' : 'None');
+    console.log('🔗 WebSocket URL:', `${WEBSOCKET_URL}?token=${token}`);
+  }
+  
+  try {
+    websocket = new WebSocket(`${WEBSOCKET_URL}?token=${token}`);
+    
+    websocket.on('open', () => {
+      if (ENABLE_CONSOLE_LOGS) {
+        console.log('🔗 WebSocket connected for real-time monitoring');
+      }
+    });
+    
+    websocket.on('error', (error) => {
+      if (ENABLE_CONSOLE_LOGS) {
+        console.warn('⚠️ WebSocket error:', error.message);
+        console.warn('⚠️ WebSocket error code:', error.code);
+        console.warn('⚠️ WebSocket error details:', error);
+      }
+    });
+    
+    websocket.on('close', () => {
+      if (ENABLE_CONSOLE_LOGS) {
+        console.log('🔌 WebSocket disconnected');
+      }
+    });
+    
+    websocket.on('message', (data) => {
+      try {
+        const message = JSON.parse(data.toString());
+        
+        if (ENABLE_CONSOLE_LOGS) {
+          console.log('📨 WebSocket message received:', message.type);
+        }
+        
+        if (message.type === 'notification') {
+          if (ENABLE_CONSOLE_LOGS) {
+            console.log('🔔 Notification received via WebSocket:', message.data);
+          }
+          // Send notification to renderer
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            if (ENABLE_CONSOLE_LOGS) {
+              console.log('📤 Sending notification to renderer:', message.data.title);
+            }
+            mainWindow.webContents.send('status', {
+              type: 'notification',
+              data: message.data
+            });
+          } else {
+            if (ENABLE_CONSOLE_LOGS) {
+              console.warn('⚠️ Cannot send notification: mainWindow not available');
+            }
+          }
+        } else if (message.type === 'connected') {
+          if (ENABLE_CONSOLE_LOGS) {
+            console.log('🔗 WebSocket connection confirmed');
+          }
+          // Send connection status to renderer
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('status', {
+              type: 'connected'
+            });
+          }
+        }
+      } catch (error) {
+        if (ENABLE_CONSOLE_LOGS) {
+          console.warn('⚠️ Invalid WebSocket message:', error.message);
+        }
+      }
+    });
+  } catch (error) {
+    if (ENABLE_CONSOLE_LOGS) {
+      console.warn('⚠️ WebSocket connection failed:', error.message);
+    }
+  }
+};
+
+const pushRealtimeData = async (data) => {
+  try {
+    // Push via WebSocket if connected
+    if (websocket && websocket.readyState === WebSocket.OPEN) {
+      websocket.send(JSON.stringify({
+        type: 'activity_update',
+        data: data,
+        timestamp: new Date().toISOString()
+      }));
+    }
+    
+    // Also push via REST API as fallback
+    if (activityContext && activityContext.token) {
+      const client = withAuth(activityContext.token);
+      await client.post('/realtime/activity', {
+        userId: activityContext.userId,
+        data: data,
+        timestamp: new Date().toISOString()
+      });
+    }
+  } catch (error) {
+    console.warn('⚠️ Real-time push failed:', error.message);
+  }
+};
+
+const startRealtimeMonitoring = (context) => {
+  if (realtimeTimer || !REALTIME_ENABLED) return;
+  
+  realtimeTimer = setInterval(async () => {
+    try {
+      const [windowInfo, load] = await Promise.all([
+        getActiveWindow(),
+        si.currentLoad()
+      ]);
+      
+      const idleSeconds = powerMonitor.getSystemIdleTime();
+      const currentTime = new Date();
+      
+      const activityData = {
+        userId: context.userId,
+        taskId: context.taskId,
+        timeLogId: context.timeLogId,
+        windowTitle: windowInfo?.title || 'Unknown',
+        appName: windowInfo?.owner?.name || 'Unknown',
+        url: windowInfo?.url || null,
+        idleSeconds,
+        keyboardCount,
+        mouseCount,
+        cpuUsage: load?.currentload ? Number(load.currentload.toFixed(2)) : 0,
+        activityScore: Math.max(0, Math.min(1, (15 - idleSeconds) / 15)),
+        timestamp: currentTime.toISOString()
+      };
+      
+      // Only push if data has changed significantly
+      if (!lastActivityData || 
+          lastActivityData.windowTitle !== activityData.windowTitle ||
+          lastActivityData.appName !== activityData.appName ||
+          Math.abs(lastActivityData.idleSeconds - activityData.idleSeconds) > 5) {
+        
+        await pushRealtimeData(activityData);
+        lastActivityData = activityData;
+      }
+    } catch (error) {
+      if (ENABLE_CONSOLE_LOGS) {
+        console.warn('⚠️ Real-time monitoring failed:', error.message);
+      }
+    }
+  }, REALTIME_INTERVAL_MS);
+};
+
+const stopRealtimeMonitoring = () => {
+  if (realtimeTimer) {
+    clearInterval(realtimeTimer);
+    realtimeTimer = null;
+  }
+  
+  if (websocket) {
+    websocket.close();
+    websocket = null;
+  }
+  
+  lastActivityData = null;
 };
 
 const stopScreenshotCapture = () => {
@@ -111,15 +322,220 @@ const startScreenshotCapture = (context) => {
   captureTimer = setInterval(captureAndUpload, SCREENSHOT_INTERVAL_MS);
 };
 
+// macOS Permissions Check
+const checkMacOSPermissions = async () => {
+  if (process.platform !== 'darwin') return true;
+  
+  const permissions = {
+    accessibility: false,
+    screenRecording: false,
+    automation: false
+  };
+  
+  try {
+    // Test accessibility permission
+    if (MACOS_ACCESSIBILITY_REQUIRED) {
+      try {
+        const testWindow = await getActiveWindow();
+        permissions.accessibility = testWindow && testWindow.title !== 'Unknown Window';
+      } catch (error) {
+        permissions.accessibility = false;
+      }
+    }
+    
+    // Test screen recording permission
+    if (MACOS_SCREEN_RECORDING_REQUIRED) {
+      try {
+        await screenshotDesktop();
+        permissions.screenRecording = true;
+      } catch (error) {
+        permissions.screenRecording = false;
+      }
+    }
+    
+    // Test automation permission (AppleScript)
+    if (MACOS_AUTOMATION_REQUIRED && APPLESCRIPT_ENABLED) {
+      try {
+        const { exec } = require('child_process');
+        const { promisify } = require('util');
+        const execAsync = promisify(exec);
+        
+        await execAsync('osascript -e "tell application \\"System Events\\" to get name of first process"');
+        permissions.automation = true;
+      } catch (error) {
+        permissions.automation = false;
+      }
+    }
+    
+    return permissions;
+  } catch (error) {
+    if (ENABLE_CONSOLE_LOGS) {
+      console.warn('⚠️ Permission check failed:', error.message);
+    }
+    return permissions;
+  }
+};
+
 const getActiveWindow = async () => {
   try {
     if (!activeWinModule) {
-      activeWinModule = await import('active-win');
+      activeWinModule = await import('@produce8/p8-active-win');
     }
     const resolver = activeWinModule.default || activeWinModule;
-    return await resolver();
+    const windowInfo = await resolver();
+    
+    // If we got a valid window, try to enhance it with AppleScript for browsers
+    if (windowInfo && windowInfo.owner && windowInfo.owner.name) {
+      const appName = windowInfo.owner.name;
+      
+      // Check if it's a browser we can enhance with AppleScript (exact name matching)
+      const supportedBrowsers = ['Google Chrome', 'Brave Browser', 'Microsoft Edge', 'Safari', 'Firefox'];
+      if (supportedBrowsers.includes(appName) && ENHANCED_BROWSER_DETECTION && APPLESCRIPT_ENABLED) {
+        try {
+          const enhancedInfo = await getBrowserTabInfo(appName, windowInfo);
+          if (enhancedInfo && enhancedInfo.enhanced) {
+            return enhancedInfo;
+          }
+        } catch (error) {
+          if (ENABLE_CONSOLE_LOGS) {
+            console.warn('⚠️ AppleScript enhancement failed:', error.message);
+          }
+        }
+      }
+    }
+    
+    return windowInfo;
   } catch (error) {
-    return null;
+    if (ENABLE_CONSOLE_LOGS) {
+      console.warn('⚠️ @produce8/p8-active-win failed, using fallback detection:', error.message);
+    }
+    // Fallback: Return basic window info without active-win
+    return {
+      title: 'Unknown Window',
+      owner: { name: 'Unknown App' },
+      url: null
+    };
+  }
+};
+
+// Enhanced AppleScript helper to get browser tab information with URL capture
+const getBrowserTabInfo = async (appName, baseInfo) => {
+  const { exec } = require('child_process');
+  const { promisify } = require('util');
+  const execAsync = promisify(exec);
+  
+  try {
+    let script = '';
+    
+    // Enhanced AppleScript for different browsers with URL capture
+    switch (appName) {
+      case 'Google Chrome':
+        script = `
+          osascript -e '
+          tell application "Google Chrome"
+            if (count of windows) > 0 then
+              set activeTab to active tab of front window
+              set tabTitle to title of activeTab
+              set tabUrl to URL of activeTab
+              return tabTitle & "||" & tabUrl
+            else
+              return "No active window||"
+            end if
+          end tell'
+        `;
+        break;
+        
+      case 'Brave Browser':
+        script = `
+          osascript -e '
+          tell application "Brave Browser"
+            if (count of windows) > 0 then
+              set activeTab to active tab of front window
+              set tabTitle to title of activeTab
+              set tabUrl to URL of activeTab
+              return tabTitle & "||" & tabUrl
+            else
+              return "No active window||"
+            end if
+          end tell'
+        `;
+        break;
+        
+      case 'Microsoft Edge':
+        script = `
+          osascript -e '
+          tell application "Microsoft Edge"
+            if (count of windows) > 0 then
+              set activeTab to active tab of front window
+              set tabTitle to title of activeTab
+              set tabUrl to URL of activeTab
+              return tabTitle & "||" & tabUrl
+            else
+              return "No active window||"
+            end if
+          end tell'
+        `;
+        break;
+        
+      case 'Safari':
+        script = `
+          osascript -e '
+          tell application "Safari"
+            if (count of windows) > 0 then
+              set activeTab to current tab of front window
+              set tabTitle to name of activeTab
+              set tabUrl to URL of activeTab
+              return tabTitle & "||" & tabUrl
+            else
+              return "No active window||"
+            end if
+          end tell'
+        `;
+        break;
+        
+      case 'Firefox':
+        // Firefox doesn't expose active tab URLs via AppleScript
+        script = `
+          osascript -e '
+          tell application "Firefox"
+            if (count of windows) > 0 then
+              set tabTitle to name of front window
+              return tabTitle & "||"
+            else
+              return "No active window||"
+            end if
+          end tell'
+        `;
+        break;
+        
+      default:
+        return baseInfo;
+    }
+    
+    if (script) {
+      const { stdout } = await execAsync(script);
+      const result = stdout.trim();
+      
+      if (result && result !== 'No active window||') {
+        const [tabTitle, tabURL] = result.split('||');
+        const title = tabTitle?.trim() || baseInfo.title;
+        const url = tabURL?.trim() || baseInfo.url;
+        
+        console.log(`🌐 Enhanced browser tab: ${title} (${url})`);
+        
+        return {
+          ...baseInfo,
+          title: title,
+          url: url,
+          enhanced: true
+        };
+      }
+    }
+    
+    return baseInfo;
+  } catch (error) {
+    console.warn('⚠️ AppleScript execution failed:', error.message);
+    return baseInfo;
   }
 };
 
@@ -182,28 +598,70 @@ const stopActivityTracking = () => {
   activityContext = null;
 };
 
+// Track previous window state for tab switching detection
+let previousWindowState = null;
+let windowSwitchCount = 0;
+let lastWindowSwitchTime = null;
+
 const captureActivitySample = async () => {
-  if (!activityContext) return;
+  if (!activityContext) {
+    console.log('⚠️ No activity context - stopping activity tracking');
+    stopActivityTracking();
+    return;
+  }
+  
+  if (!activityContext.taskId || !activityContext.timeLogId) {
+    console.log('⚠️ Invalid activity context - missing taskId or timeLogId');
+    return;
+  }
+  
   try {
     const [windowInfo, load] = await Promise.all([getActiveWindow(), si.currentLoad()]);
     const idleSeconds = powerMonitor.getSystemIdleTime();
     const durationSeconds = Math.round(ACTIVITY_INTERVAL_MS / 1000);
     const timestamp = new Date();
 
+    // Enhanced tab switching detection
+    const currentWindowState = {
+      title: windowInfo?.title || 'Unknown',
+      app: windowInfo?.owner?.name || 'Unknown',
+      url: windowInfo?.url || null
+    };
+
+    // Detect window/tab switches
+    const isWindowSwitch = previousWindowState && 
+      (previousWindowState.title !== currentWindowState.title || 
+       previousWindowState.app !== currentWindowState.app);
+
+    if (isWindowSwitch) {
+      windowSwitchCount++;
+      lastWindowSwitchTime = timestamp.toISOString();
+      console.log(`🔄 Tab/Window Switch Detected: ${previousWindowState.title} → ${currentWindowState.title}`);
+    }
+
+    // Enhanced activity scoring with tab switching consideration
+    const baseActivityScore = Math.max(0, Math.min(1, (durationSeconds - idleSeconds) / durationSeconds));
+    const switchBonus = isWindowSwitch ? 0.1 : 0; // Bonus for active tab switching
+    const enhancedActivityScore = Math.min(1, baseActivityScore + switchBonus);
+
     const payload = {
       capturedAt: timestamp.toISOString(),
       durationSeconds,
-      windowTitle: windowInfo?.title || 'Unknown',
-      appName: windowInfo?.owner?.name || 'Unknown',
-      url: windowInfo?.url || null,
+      windowTitle: currentWindowState.title,
+      appName: currentWindowState.app,
+      url: currentWindowState.url,
       idleSeconds,
-      activityScore: Math.max(0, Math.min(1, (durationSeconds - idleSeconds) / durationSeconds)),
+      activityScore: enhancedActivityScore,
       cpuUsage: load?.currentload ? Number(load.currentload.toFixed(2)) : 0,
       keyboardCount,
       mouseCount,
       keystrokes: keystrokeBuffer.slice(0, 200),
       taskId: activityContext.taskId,
-      timeLogId: activityContext.timeLogId
+      timeLogId: activityContext.timeLogId,
+      // Enhanced tracking data
+      isWindowSwitch,
+      windowSwitchCount,
+      lastWindowSwitchTime
     };
 
     const client = withAuth(activityContext.token);
@@ -214,11 +672,17 @@ const captureActivitySample = async () => {
       timestamp: timestamp.toISOString(),
       windowTitle: payload.windowTitle,
       appName: payload.appName,
+      url: payload.url,
       idleSeconds,
       cpuUsage: payload.cpuUsage,
       keyboardCount: payload.keyboardCount,
-      mouseCount: payload.mouseCount
+      mouseCount: payload.mouseCount,
+      isWindowSwitch,
+      windowSwitchCount
     });
+
+    // Update previous window state
+    previousWindowState = currentWindowState;
 
     keyboardCount = 0;
     mouseCount = 0;
@@ -230,16 +694,38 @@ const captureActivitySample = async () => {
 };
 
 const startActivityTracking = (context) => {
+  if (!context || !context.taskId || !context.timeLogId || !context.token) {
+    console.error('❌ Invalid activity context provided:', context);
+    return;
+  }
+  
   stopActivityTracking();
   activityContext = context;
+  console.log('✅ Starting activity tracking for task:', context.taskId);
   captureActivitySample();
   activityTimer = setInterval(captureActivitySample, ACTIVITY_INTERVAL_MS);
 };
 
 const startTracking = (context) => {
+  if (!context || !context.taskId || !context.timeLogId || !context.token) {
+    console.error('❌ Invalid tracking context provided:', context);
+    sendStatus({ type: 'error', message: 'Invalid tracking context' });
+    return;
+  }
+  
+  console.log('🚀 Starting tracking for task:', context.taskId);
   startScreenshotCapture(context);
   startActivityTracking(context);
   startInputHooks();
+  startRealtimeMonitoring(context);
+  
+  // Only connect to WebSocket if we have a valid token
+  if (context.token && context.token.length > 10) {
+    connectWebSocket(context.token);
+  } else {
+    console.warn('⚠️ Invalid token provided for WebSocket connection');
+  }
+  
   sendStatus({ type: 'timer', state: 'running' });
 };
 
@@ -247,14 +733,107 @@ const stopTracking = () => {
   stopScreenshotCapture();
   stopActivityTracking();
   stopInputHooks();
+  stopRealtimeMonitoring();
+};
+
+const createTray = () => {
+  // Create system tray - use appropriate format for platform
+  let trayIcon;
+  
+  if (process.platform === 'darwin') {
+    // macOS - use PNG format
+    trayIcon = path.join(__dirname, '..', 'build', 'icon.png');
+  } else {
+    // Windows/Linux - use ICO format
+    trayIcon = path.join(__dirname, '..', 'build', 'icon.ico');
+  }
+  
+  try {
+    tray = new Tray(trayIcon);
+    console.log('✅ System tray icon loaded successfully');
+  } catch (error) {
+    console.warn('⚠️ Could not load tray icon:', error.message);
+    
+    // Try fallback icon format
+    const fallbackIcon = process.platform === 'darwin' 
+      ? path.join(__dirname, '..', 'build', 'icon.ico')
+      : path.join(__dirname, '..', 'build', 'icon.png');
+    
+    try {
+      tray = new Tray(fallbackIcon);
+      console.log('✅ System tray icon loaded with fallback format');
+    } catch (fallbackError) {
+      console.error('❌ Failed to create system tray:', fallbackError.message);
+      return; // Skip tray creation if it fails completely
+    }
+  }
+  
+  // Only create menu if tray was successfully created
+  if (!tray) {
+    console.log('⚠️ Skipping tray menu creation - tray not available');
+    return;
+  }
+  
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: 'Show WebWork Tracker',
+      click: () => {
+        if (mainWindow) {
+          mainWindow.show();
+          mainWindow.focus();
+        }
+      }
+    },
+    {
+      label: 'Hide',
+      click: () => {
+        if (mainWindow) {
+          mainWindow.hide();
+        }
+      }
+    },
+    { type: 'separator' },
+    {
+      label: 'Quit',
+      click: () => {
+        app.isQuiting = true;
+        app.quit();
+      }
+    }
+  ]);
+  
+  tray.setContextMenu(contextMenu);
+  tray.setToolTip('WebWork Tracker - Time Tracking');
+  
+  // Show window when tray icon is clicked
+  tray.on('click', () => {
+    if (mainWindow) {
+      if (mainWindow.isVisible()) {
+        mainWindow.hide();
+      } else {
+        mainWindow.show();
+        mainWindow.focus();
+      }
+    }
+  });
+  
+  console.log('✅ System tray created');
 };
 
 const createWindow = () => {
   mainWindow = new BrowserWindow({
     width: 420,
     height: 640,
-    resizable: false,
+    minWidth: 360,
+    minHeight: 500,
+    maxWidth: 1200,
+    maxHeight: 800,
+    resizable: true,
+    maximizable: true,
+    minimizable: true,
+    closable: true,
     title: 'WebWork Tracker',
+    icon: path.join(__dirname, '..', 'build', 'icon.ico'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -262,13 +841,44 @@ const createWindow = () => {
     }
   });
 
+  // Handle window close - minimize to tray instead of quitting
+  mainWindow.on('close', (event) => {
+    if (!app.isQuiting) {
+      event.preventDefault();
+      mainWindow.hide();
+    }
+  });
+
   mainWindow.removeMenu();
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 };
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  // Check macOS permissions on startup
+  if (process.platform === 'darwin') {
+    const permissions = await checkMacOSPermissions();
+    
+    if (ENABLE_CONSOLE_LOGS) {
+      console.log('🔐 macOS Permissions Status:');
+      console.log(`  Accessibility: ${permissions.accessibility ? '✅' : '❌'}`);
+      console.log(`  Screen Recording: ${permissions.screenRecording ? '✅' : '❌'}`);
+      console.log(`  Automation: ${permissions.automation ? '✅' : '❌'}`);
+      
+      if (!permissions.accessibility && MACOS_ACCESSIBILITY_REQUIRED) {
+        console.warn('⚠️ Accessibility permission required for window detection');
+      }
+      if (!permissions.screenRecording && MACOS_SCREEN_RECORDING_REQUIRED) {
+        console.warn('⚠️ Screen Recording permission required for screenshots');
+      }
+      if (!permissions.automation && MACOS_AUTOMATION_REQUIRED) {
+        console.warn('⚠️ Automation permission required for enhanced browser detection');
+      }
+    }
+  }
+  
+  createTray();
   createWindow();
-
+  
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
@@ -280,9 +890,12 @@ app.on('window-all-closed', () => {
   if (powerMonitor) {
     stopTracking();
   }
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  // Don't quit the app - keep it running in the system tray
+  // The app will only quit when explicitly requested from the tray menu
+});
+
+app.on('before-quit', () => {
+  app.isQuiting = true;
 });
 
 ipcMain.handle('auth:login', async (_event, credentials) => {
@@ -334,11 +947,6 @@ ipcMain.handle('timer:stop', async (_event, { token }) => {
   return data.data;
 });
 
-ipcMain.on('tracker:logout', () => {
-  stopTracking();
-  sendStatus({ type: 'timer', state: 'idle' });
-});
-
 ipcMain.handle('attendance:clockIn', async (_event, { token, shiftId }) => {
   const client = withAuth(token);
   const { data } = await client.post('/attendance/clock-in', { shiftId });
@@ -355,6 +963,11 @@ ipcMain.handle('attendance:active', async (_event, { token }) => {
   const client = withAuth(token);
   const { data } = await client.get('/attendance/active');
   return data.data;
+});
+
+ipcMain.on('tracker:logout', () => {
+  stopTracking();
+  sendStatus({ type: 'timer', state: 'idle' });
 });
 
 app.on('before-quit', () => {

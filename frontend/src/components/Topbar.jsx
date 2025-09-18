@@ -1,5 +1,6 @@
 import { useAuth } from '../context/AuthContext.jsx';
 import { useTheme } from '../context/ThemeContext.jsx';
+import NotificationCenter from './NotificationCenter.jsx';
 
 const Topbar = ({ title, actions }) => {
   const { user } = useAuth();
@@ -12,6 +13,7 @@ const Topbar = ({ title, actions }) => {
         <p className="text-sm text-slate-500 dark:text-slate-400">Logged in as {user?.role?.toUpperCase()}</p>
       </div>
       <div className="flex items-center gap-3">
+        <NotificationCenter />
         <button
           onClick={toggleTheme}
           className="p-2 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors duration-200"

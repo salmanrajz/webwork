@@ -7,7 +7,7 @@ body {
 }
 
 /* Dark mode support */
-html[data-theme="dark"] {
+html.dark {
   color-scheme: dark;
 }
 
@@ -25,15 +25,132 @@ html[data-theme="dark"] {
   border-radius: 4px;
 }
 
-html[data-theme="dark"] ::-webkit-scrollbar-track {
+html.dark ::-webkit-scrollbar-track {
   background: #1e293b;
 }
 
-html[data-theme="dark"] ::-webkit-scrollbar-thumb {
+html.dark ::-webkit-scrollbar-thumb {
   background: #475569;
 }
 
 /* Smooth transitions for theme changes */
 * {
   transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+}
+
+/* Modal z-index management */
+.modal-overlay {
+  z-index: 1000;
+}
+
+.modal-content {
+  z-index: 1001;
+}
+
+.modal-overlay-2 {
+  z-index: 2000;
+}
+
+.modal-content-2 {
+  z-index: 2001;
+}
+
+/* Fix dark modal on modal issue */
+.modal-overlay {
+  background-color: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+}
+
+html.dark .modal-overlay {
+  background-color: rgba(0, 0, 0, 0.7);
+}
+
+/* Ensure modals have proper contrast */
+.modal-content {
+  background-color: white;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+html.dark .modal-content {
+  background-color: #1e293b;
+  border: 1px solid #334155;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+/* Fix input fields in dark mode */
+.modal-content input,
+.modal-content textarea,
+.modal-content select {
+  background-color: white;
+  border-color: #d1d5db;
+  color: #111827;
+}
+
+html.dark .modal-content input,
+html.dark .modal-content textarea,
+html.dark .modal-content select {
+  background-color: #374151;
+  border-color: #4b5563;
+  color: #f9fafb;
+}
+
+html.dark .modal-content input::placeholder,
+html.dark .modal-content textarea::placeholder {
+  color: #9ca3af;
+}
+
+/* Fix dropdown options in dark mode */
+html.dark .modal-content select option {
+  background-color: #374151;
+  color: #f9fafb;
+}
+
+/* Ensure proper text contrast in modals */
+.modal-content h1,
+.modal-content h2,
+.modal-content h3,
+.modal-content h4,
+.modal-content h5,
+.modal-content h6 {
+  color: #111827;
+}
+
+html.dark .modal-content h1,
+html.dark .modal-content h2,
+html.dark .modal-content h3,
+html.dark .modal-content h4,
+html.dark .modal-content h5,
+html.dark .modal-content h6 {
+  color: #f9fafb;
+}
+
+.modal-content p,
+.modal-content span,
+.modal-content div {
+  color: #374151;
+}
+
+html.dark .modal-content p,
+html.dark .modal-content span,
+html.dark .modal-content div {
+  color: #d1d5db;
+}
+
+/* Fix button contrast in modals */
+.modal-content button {
+  border: 1px solid #d1d5db;
+}
+
+html.dark .modal-content button {
+  border: 1px solid #4b5563;
+}
+
+/* Fix label text in modals */
+.modal-content label {
+  color: #374151;
+}
+
+html.dark .modal-content label {
+  color: #d1d5db;
 }

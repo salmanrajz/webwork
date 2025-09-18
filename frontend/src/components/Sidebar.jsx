@@ -17,6 +17,7 @@ const Sidebar = () => {
       baseItems[0],
       { path: '/agents', label: 'Agents', icon: '🧑‍💻' },
       { path: '/tasks', label: 'Tasks', icon: '🧾' },
+      { path: '/notifications', label: 'Notifications', icon: '🔔' },
       ...(user.role === 'admin' ? [{ path: '/users', label: 'Users', icon: '🧑‍⚖️' }] : []),
       ...(user.role === 'admin' ? [{ path: '/restrictions', label: 'Restrictions', icon: '🚫' }] : []),
       ...(user.role !== 'employee' ? [{ path: '/tasks/assign', label: 'Assign tasks', icon: '🗂' }] : []),

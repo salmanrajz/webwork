@@ -2,11 +2,11 @@ import { format } from 'date-fns';
 import Button from './Button.jsx';
 
 const ScreenshotGallery = ({ screenshots = [], onRefresh, onDelete, canDelete = false }) => (
-  <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+  <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-6 shadow-sm transition-colors duration-300">
     <div className="mb-4 flex items-center justify-between">
       <div>
-        <h3 className="text-lg font-semibold text-slate-800">Screenshots</h3>
-        <p className="text-sm text-slate-500">
+        <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Screenshots</h3>
+        <p className="text-sm text-slate-500 dark:text-slate-400">
           Automatic captures linked to running timers. Click to view in full size.
         </p>
       </div>
@@ -17,13 +17,13 @@ const ScreenshotGallery = ({ screenshots = [], onRefresh, onDelete, canDelete = 
       )}
     </div>
     {screenshots.length === 0 ? (
-      <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-10 text-center text-sm text-slate-500">
+      <div className="rounded-lg border border-dashed border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 p-10 text-center text-sm text-slate-500 dark:text-slate-400 transition-colors duration-300">
         No screenshots available for the selected filters.
       </div>
     ) : (
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {screenshots.map((shot) => (
-          <div key={shot.id} className="group relative overflow-hidden rounded-lg border border-slate-200 bg-slate-900/80">
+          <div key={shot.id} className="group relative overflow-hidden rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-900/80 transition-colors duration-300">
             <a href={`/uploads/${shot.imagePath}`} target="_blank" rel="noreferrer">
               <img
                 src={`/uploads/${shot.imagePath}`}

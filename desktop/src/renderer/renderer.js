@@ -10,9 +10,28 @@ const userRole = document.getElementById('user-role');
 const logoutButton = document.getElementById('logout');
 const statusLabel = document.getElementById('status');
 const statusNote = document.getElementById('status-note');
+const tabSwitchIndicator = document.getElementById('tab-switch-indicator');
+const switchCount = document.getElementById('switch-count');
+const lastSwitch = document.getElementById('last-switch');
+const timerDisplay = document.getElementById('timer-display');
+const elapsedTime = document.getElementById('elapsed-time');
 const attendanceState = document.getElementById('attendance-state');
 const attendanceNote = document.getElementById('attendance-note');
 const clockToggleBtn = document.getElementById('clock-toggle');
+
+// Modal elements
+const analyticsBtn = document.getElementById('analytics-btn');
+const productivityBtn = document.getElementById('productivity-btn');
+const settingsBtn = document.getElementById('settings-btn');
+const themeToggle = document.getElementById('theme-toggle');
+const analyticsModal = document.getElementById('analytics-modal');
+const productivityModal = document.getElementById('productivity-modal');
+const breakSettingsModal = document.getElementById('break-settings-modal');
+const closeAnalytics = document.getElementById('close-analytics');
+const closeProductivity = document.getElementById('close-productivity');
+const closeSettings = document.getElementById('close-settings');
+const saveSettings = document.getElementById('save-settings');
+const cancelSettings = document.getElementById('cancel-settings');
 const startBtn = document.getElementById('start');
 const pauseBtn = document.getElementById('pause');
 const resumeBtn = document.getElementById('resume');
@@ -24,12 +43,90 @@ const state = {
   user: null,
   activeLog: null,
   tasks: [],
-  attendance: null
+  attendance: null,
+  theme: localStorage.getItem('webwork_theme') || 'light',
+  breakSettings: {
+    enabled: true,
+    interval: 60,
+    dailyTarget: 8
+  },
+  notifications: [],
+  isConnected: false
 };
 
 const setStatus = (text, note = '') => {
   statusLabel.textContent = text;
   statusNote.textContent = note;
+};
+
+// Notification handling functions
+const addNotification = (notification) => {
+  state.notifications.unshift(notification);
+  // Keep only last 50 notifications
+  if (state.notifications.length > 50) {
+    state.notifications = state.notifications.slice(0, 50);
+  }
+  updateNotificationDisplay();
+  
+  // Show browser notification if permission granted
+  if (Notification.permission === 'granted') {
+    new Notification(notification.title, {
+      body: notification.message,
+      icon: '../build/icon.ico',
+      tag: notification.id
+    });
+  }
+};
+
+const updateNotificationDisplay = () => {
+  // Update notification count in UI if element exists
+  const notificationCount = document.getElementById('notification-count');
+  if (notificationCount) {
+    notificationCount.textContent = state.notifications.length;
+    notificationCount.style.display = state.notifications.length > 0 ? 'block' : 'none';
+  }
+  
+  // Update notifications list
+  const notificationsList = document.getElementById('notifications-list');
+  if (notificationsList) {
+    if (state.notifications.length === 0) {
+      notificationsList.innerHTML = '<p class="no-notifications">No notifications yet</p>';
+    } else {
+      notificationsList.innerHTML = state.notifications.map(notification => `
+        <div class="notification-item">
+          <div class="notification-header">
+            <span class="notification-icon">${getNotificationIcon(notification.type)}</span>
+            <h4 class="notification-title">${notification.title}</h4>
+          </div>
+          <p class="notification-message">${notification.message}</p>
+          <div class="notification-meta">
+            <span class="notification-priority ${notification.priority}">${notification.priority}</span>
+            <span>${new Date(notification.timestamp).toLocaleString()}</span>
+          </div>
+        </div>
+      `).join('');
+    }
+  }
+};
+
+const getNotificationIcon = (type) => {
+  const icons = {
+    info: 'ℹ️',
+    task: '📋',
+    reminder: '⏰',
+    system: '🔧',
+    warning: '⚠️',
+    success: '✅'
+  };
+  return icons[type] || '📢';
+};
+
+const requestNotificationPermission = async () => {
+  if ('Notification' in window && Notification.permission === 'default') {
+    const permission = await Notification.requestPermission();
+    return permission === 'granted';
+  }
+  return Notification.permission === 'granted';
 };
 
 const isProduction = false; // Always show logs in development
@@ -207,11 +304,29 @@ clockToggleBtn.addEventListener('click', async () => {
       state.attendance = null;
       setAttendanceDisplay();
       logEvent('Clocked out at ' + new Date(record.clockOut).toLocaleTimeString());
+      
+      // Show push notification when clocking out
+      if (Notification.permission === 'granted') {
+        new Notification('WebWork Tracker - Clocked Out', {
+          body: `Clocked out at ${new Date(record.clockOut).toLocaleTimeString()}`,
+          icon: '../build/icon.ico',
+          tag: 'clock-out'
+        });
+      }
     } else {
       const record = await window.desktop.clockIn({ token: state.token });
       state.attendance = record;
       setAttendanceDisplay();
       logEvent('Clocked in at ' + new Date(record.clockIn).toLocaleTimeString());
+      
+      // Show push notification when clocking in
+      if (Notification.permission === 'granted') {
+        new Notification('WebWork Tracker - Clocked In', {
+          body: `Clocked in at ${new Date(record.clockIn).toLocaleTimeString()}`,
+          icon: '../build/icon.ico',
+          tag: 'clock-in'
+        });
+      }
     }
   } catch (error) {
     logEvent('Attendance update failed: ' + (error?.response?.data?.message || error.message));
@@ -227,6 +342,15 @@ startBtn.addEventListener('click', async () => {
     setStatus('Running', 'Tracking started.');
     setButtonsState({ running: true });
     logEvent(`Started timer for task ${taskSelect.selectedOptions[0].text}`);
+    
+    // Show push notification when starting tracking
+    if (Notification.permission === 'granted') {
+      new Notification('WebWork Tracker Started', {
+        body: `Started tracking task: ${taskSelect.selectedOptions[0].text}`,
+        icon: '../build/icon.ico',
+        tag: 'tracker-start'
+      });
+    }
   } catch (error) {
     logEvent('Failed to start timer: ' + (error?.response?.data?.message || error.message));
   }
@@ -239,6 +363,15 @@ pauseBtn.addEventListener('click', async () => {
     setStatus('Paused', 'Timer paused.');
     setButtonsState({ running: false });
     logEvent('Timer paused.');
+    
+    // Show push notification when pausing
+    if (Notification.permission === 'granted') {
+      new Notification('WebWork Tracker Paused', {
+        body: 'Timer has been paused',
+        icon: '../build/icon.ico',
+        tag: 'tracker-pause'
+      });
+    }
   } catch (error) {
     logEvent('Failed to pause timer: ' + (error?.response?.data?.message || error.message));
   }
@@ -253,6 +386,15 @@ resumeBtn.addEventListener('click', async () => {
     setStatus('Running', 'Timer resumed.');
     setButtonsState({ running: true });
     logEvent('Timer resumed.');
+    
+    // Show push notification when resuming
+    if (Notification.permission === 'granted') {
+      new Notification('WebWork Tracker Resumed', {
+        body: 'Timer has been resumed',
+        icon: '../build/icon.ico',
+        tag: 'tracker-resume'
+      });
+    }
   } catch (error) {
     logEvent('Failed to resume timer: ' + (error?.response?.data?.message || error.message));
   }
@@ -266,6 +408,15 @@ stopBtn.addEventListener('click', async () => {
     setStatus('Idle', 'Timer stopped.');
     setButtonsState({ running: false });
     logEvent('Timer stopped.');
+    
+    // Show push notification when stopping
+    if (Notification.permission === 'granted') {
+      new Notification('WebWork Tracker Stopped', {
+        body: 'Timer has been stopped',
+        icon: '../build/icon.ico',
+        tag: 'tracker-stop'
+      });
+    }
   } catch (error) {
     logEvent('Failed to stop timer: ' + (error?.response?.data?.message || error.message));
   }
@@ -290,13 +441,45 @@ window.desktop.onStatus((payload) => {
     }
   }
   if (payload.type === 'activity') {
-    logEvent(
-      `Activity sample: ${payload.windowTitle || 'unknown window'}${
-        payload.idleSeconds ? ` • idle ${payload.idleSeconds}s` : ''
-      }${payload.keyboardCount !== undefined ? ` • keys ${payload.keyboardCount}` : ''}${
-        payload.mouseCount !== undefined ? ` • mouse ${payload.mouseCount}` : ''
-      }`
-    );
+    let activityText = `Activity: ${payload.windowTitle || 'unknown window'}`;
+    
+    // Add URL if available
+    if (payload.url) {
+      activityText += ` (${payload.url})`;
+    }
+    
+    // Add tab switching indicator
+    if (payload.isWindowSwitch) {
+      activityText += ` 🔄 SWITCH`;
+    }
+    
+    // Add activity metrics
+    if (payload.idleSeconds) {
+      activityText += ` • idle ${payload.idleSeconds}s`;
+    }
+    if (payload.keyboardCount !== undefined) {
+      activityText += ` • keys ${payload.keyboardCount}`;
+    }
+    if (payload.mouseCount !== undefined) {
+      activityText += ` • mouse ${payload.mouseCount}`;
+    }
+    
+    // Add switch count if available
+    if (payload.windowSwitchCount !== undefined) {
+      activityText += ` • switches ${payload.windowSwitchCount}`;
+    }
+    
+    logEvent(activityText);
+    
+    // Update tab switching indicator
+    if (payload.windowSwitchCount !== undefined) {
+      tabSwitchIndicator.classList.remove('hidden');
+      switchCount.textContent = `${payload.windowSwitchCount} switches`;
+      
+      if (payload.isWindowSwitch) {
+        lastSwitch.textContent = `Last switch: ${new Date().toLocaleTimeString()}`;
+      }
+    }
   }
   if (payload.type === 'error') {
     logEvent('Error: ' + payload.message);
@@ -323,5 +506,213 @@ const restoreSession = async () => {
   }
 };
 
+// Theme management
+const applyTheme = (theme) => {
+  document.documentElement.setAttribute('data-theme', theme);
+  const themeIcon = document.querySelector('.theme-icon');
+  if (themeIcon) {
+    themeIcon.textContent = theme === 'dark' ? '☀️' : '🌙';
+  }
+  localStorage.setItem('webwork_theme', theme);
+  state.theme = theme;
+};
+
+// Timer display
+let timerInterval = null;
+const startTimer = () => {
+  if (timerInterval) return;
+  const startTime = new Date();
+  timerDisplay.classList.remove('hidden');
+  
+  timerInterval = setInterval(() => {
+    const now = new Date();
+    const elapsed = now - startTime;
+    const hours = Math.floor(elapsed / 3600000);
+    const minutes = Math.floor((elapsed % 3600000) / 60000);
+    const seconds = Math.floor((elapsed % 60000) / 1000);
+    elapsedTime.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  }, 1000);
+};
+
+const stopTimer = () => {
+  if (timerInterval) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+  }
+  timerDisplay.classList.add('hidden');
+  elapsedTime.textContent = '00:00:00';
+};
+
+// Attendance management
+
+// Modal management
+const showModal = (modal) => {
+  modal.classList.remove('hidden');
+};
+
+const hideModal = (modal) => {
+  modal.classList.add('hidden');
+};
+
+// Event handlers
+themeToggle.addEventListener('click', () => {
+  const newTheme = state.theme === 'light' ? 'dark' : 'light';
+  applyTheme(newTheme);
+});
+
+analyticsBtn.addEventListener('click', () => {
+  showModal(analyticsModal);
+});
+
+productivityBtn.addEventListener('click', () => {
+  showModal(productivityModal);
+});
+
+settingsBtn.addEventListener('click', () => {
+  showModal(breakSettingsModal);
+});
+
+closeAnalytics.addEventListener('click', () => {
+  hideModal(analyticsModal);
+});
+
+closeProductivity.addEventListener('click', () => {
+  hideModal(productivityModal);
+});
+
+closeSettings.addEventListener('click', () => {
+  hideModal(breakSettingsModal);
+});
+
+cancelSettings.addEventListener('click', () => {
+  hideModal(breakSettingsModal);
+});
+
+saveSettings.addEventListener('click', () => {
+  const enabled = document.getElementById('break-enabled').checked;
+  const interval = parseInt(document.getElementById('break-interval').value);
+  const dailyTarget = parseFloat(document.getElementById('daily-target').value);
+  
+  state.breakSettings = { enabled, interval, dailyTarget };
+  localStorage.setItem('webwork_break_settings', JSON.stringify(state.breakSettings));
+  hideModal(breakSettingsModal);
+  logEvent('Break settings saved.');
+});
+
+// Enhanced status handling
+window.desktop.onStatus((payload) => {
+  if (payload.type === 'capture') {
+    logEvent('Screenshot captured at ' + new Date(payload.timestamp).toLocaleTimeString());
+  }
+  if (payload.type === 'timer') {
+    if (payload.state === 'running') {
+      setStatus('Running', 'Tracker active.');
+      setButtonsState({ running: true });
+      startTimer();
+    }
+    if (payload.state === 'paused') {
+      setStatus('Paused', 'Tracker paused.');
+      setButtonsState({ running: false });
+      stopTimer();
+    }
+    if (payload.state === 'stopped' || payload.state === 'idle') {
+      setStatus('Idle', '');
+      setButtonsState({ running: false });
+      stopTimer();
+    }
+  }
+  if (payload.type === 'activity') {
+    let activityText = `Activity: ${payload.windowTitle || 'unknown window'}`;
+    
+    // Add URL if available
+    if (payload.url) {
+      activityText += ` (${payload.url})`;
+    }
+    
+    // Add tab switching indicator
+    if (payload.isWindowSwitch) {
+      activityText += ` 🔄 SWITCH`;
+    }
+    
+    // Add activity metrics
+    if (payload.idleSeconds) {
+      activityText += ` • idle ${payload.idleSeconds}s`;
+    }
+    if (payload.keyboardCount !== undefined) {
+      activityText += ` • keys ${payload.keyboardCount}`;
+    }
+    if (payload.mouseCount !== undefined) {
+      activityText += ` • mouse ${payload.mouseCount}`;
+    }
+    
+    // Add switch count if available
+    if (payload.windowSwitchCount !== undefined) {
+      activityText += ` • switches ${payload.windowSwitchCount}`;
+    }
+    
+    logEvent(activityText);
+    
+    // Update tab switching indicator
+    if (payload.windowSwitchCount !== undefined) {
+      tabSwitchIndicator.classList.remove('hidden');
+      switchCount.textContent = `${payload.windowSwitchCount} switches`;
+      
+      if (payload.isWindowSwitch) {
+        lastSwitch.textContent = `Last switch: ${new Date().toLocaleTimeString()}`;
+      }
+    }
+  }
+  if (payload.type === 'error') {
+    logEvent('Error: ' + payload.message);
+  }
+});
+
+// Add notification handling to the onStatus handler
+window.desktop.onStatus((payload) => {
+  console.log('📨 Renderer received payload:', payload.type);
+  if (payload.type === 'notification') {
+    console.log('🔔 Adding notification to UI:', payload.data.title);
+    addNotification(payload.data);
+  }
+  if (payload.type === 'connected') {
+    state.isConnected = true;
+    logEvent('WebSocket connected for real-time monitoring');
+  }
+});
+
+// Session restoration
+
+// Initialize
 setButtonsState({ running: false });
+applyTheme(state.theme);
 restoreSession();
+
+// Request notification permission on startup
+requestNotificationPermission();
+
+// Notification modal event handlers
+const notificationBtn = document.getElementById('notification-btn');
+const notificationsModal = document.getElementById('notifications-modal');
+const closeNotifications = document.getElementById('close-notifications');
+
+if (notificationBtn) {
+  notificationBtn.addEventListener('click', () => {
+    notificationsModal.classList.remove('hidden');
+    updateNotificationDisplay();
+  });
+}
+
+if (closeNotifications) {
+  closeNotifications.addEventListener('click', () => {
+    notificationsModal.classList.add('hidden');
+  });
+}
+
+// Close modal when clicking outside
+if (notificationsModal) {
+  notificationsModal.addEventListener('click', (e) => {
+    if (e.target === notificationsModal) {
+      notificationsModal.classList.add('hidden');
+    }
+  });
+}

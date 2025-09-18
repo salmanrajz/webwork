@@ -12,6 +12,8 @@ import UserFormPage from './pages/UserFormPage.jsx';
 import TasksPage from './pages/TasksPage.jsx';
 import AssignTasksPage from './pages/AssignTasksPage.jsx';
 import RestrictionManagement from './pages/RestrictionManagement.jsx';
+import NotificationTestPage from './pages/NotificationTestPage.jsx';
+import NotificationManagement from './pages/NotificationManagement.jsx';
 import { useAuth } from './context/AuthContext.jsx';
 import { ThemeProvider } from './context/ThemeContext.jsx';
 
@@ -119,6 +121,22 @@ const App = () => (
         element={
           <ProtectedRoute>
             <RestrictionManagement />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/notifications/test"
+        element={
+          <ProtectedRoute>
+            <NotificationTestPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/notifications"
+        element={
+          <ProtectedRoute>
+            <NotificationManagement />
           </ProtectedRoute>
         }
       />

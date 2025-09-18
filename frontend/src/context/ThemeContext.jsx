@@ -22,7 +22,11 @@ export const ThemeProvider = ({ children }) => {
 
   useEffect(() => {
     // Apply theme to document
-    document.documentElement.setAttribute('data-theme', isDarkMode ? 'dark' : 'light');
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
     localStorage.setItem('webwork_dark_mode', JSON.stringify(isDarkMode));
   }, [isDarkMode]);
 

@@ -11,6 +11,14 @@ win:
     - nsis
     - portable
   icon: build/icon.ico
+mac:
+  target:
+    - dmg
+    - zip
+  icon: build/icon.ico
+  category: public.app-category.productivity
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
 nsis:
   oneClick: false
   perMachine: false
