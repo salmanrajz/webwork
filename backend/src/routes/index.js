@@ -14,7 +14,7 @@ import shiftRoutes from './shiftRoutes.js';
 import realtimeRoutes from './realtimeRoutes.js';
 import restrictionRoutes from './restrictionRoutes.js';
 import notificationRoutes from './notificationRoutes.js';
-// import gpsRoutes from './gpsRoutes.js';
+import gpsRoutes from './gpsRoutes.js';
 
 const router = Router();
 
@@ -33,6 +33,6 @@ router.use('/shifts', shiftRoutes);
 router.use('/realtime', realtimeRoutes);
 router.use('/restrictions', restrictionRoutes);
 router.use('/notifications', notificationRoutes);
-// router.use('/gps', gpsRoutes);
+router.use('/gps', gpsRoutes);
 
 export default router;

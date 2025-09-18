@@ -10,7 +10,8 @@ const formatMinutes = (value = 0) => {
 
 const TimeLogTable = ({ logs = [] }) => (
   <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm transition-colors duration-300">
-    <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-600 text-sm">
+    <div className="overflow-x-auto">
+      <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-600 text-sm">
       <thead className="bg-slate-50 dark:bg-slate-700 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 transition-colors duration-300">
         <tr>
           <th className="px-4 py-3">Task</th>
@@ -40,7 +41,8 @@ const TimeLogTable = ({ logs = [] }) => (
           </tr>
         ))}
       </tbody>
-    </table>
+      </table>
+    </div>
     {logs.length === 0 && <div className="px-6 py-10 text-center text-sm text-slate-500 dark:text-slate-400">No time logs found.</div>}
   </div>
 );

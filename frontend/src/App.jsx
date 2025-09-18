@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import Loader from './components/Loader.jsx';
+import ErrorBoundary from './components/ErrorBoundary.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
 import ProjectsPage from './pages/ProjectsPage.jsx';
@@ -26,8 +27,9 @@ const ProtectedRoute = ({ children }) => {
 };
 
 const App = () => (
-  <ThemeProvider>
-    <Routes>
+  <ErrorBoundary>
+    <ThemeProvider>
+      <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route
         path="/"
@@ -150,8 +152,9 @@ const App = () => (
         }
       />
       <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
-  </ThemeProvider>
+      </Routes>
+    </ThemeProvider>
+  </ErrorBoundary>
 );
 
 export default App;

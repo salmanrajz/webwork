@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import Logo from './Logo.jsx';
 
-const Sidebar = () => {
+const Sidebar = ({ onClose }) => {
   const { logout, user } = useAuth();
   const baseItems = [
     { path: '/', label: 'Dashboard', icon: '📊' },
@@ -30,6 +30,15 @@ const Sidebar = () => {
     <aside className="flex h-full w-64 flex-col bg-white dark:bg-slate-800 shadow-sm transition-colors duration-300">
       <div className="flex items-center justify-between px-6 py-6">
         <Logo />
+        {/* Mobile close button */}
+        <button
+          onClick={onClose}
+          className="lg:hidden p-2 rounded-md text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
       </div>
       <nav className="flex-1 space-y-1 px-4">
         {navItems.map((item) => (
@@ -37,6 +46,7 @@ const Sidebar = () => {
             key={item.path}
             to={item.path}
             end={item.path === '/'}
+            onClick={onClose}
             className={({ isActive }) =>
               `flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-primary/30 ${
                 isActive

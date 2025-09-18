@@ -1,7 +1,9 @@
-const { DataTypes } = require('sequelize');
+import { DataTypes, Model } from 'sequelize';
+import sequelize from '../config/database.js';
 
-module.exports = (sequelize) => {
-  const Geofence = sequelize.define('Geofence', {
+class Geofence extends Model {}
+
+Geofence.init({
     id: {
       type: DataTypes.UUID,
       defaultValue: DataTypes.UUIDV4,
@@ -99,6 +101,7 @@ module.exports = (sequelize) => {
       }
     }
   }, {
+    sequelize,
     tableName: 'geofences',
     indexes: [
       {
@@ -114,27 +117,4 @@ module.exports = (sequelize) => {
     timestamps: true
   });
 
-  Geofence.associate = (models) => {
-    Geofence.belongsTo(models.Organization, {
-      foreignKey: 'organizationId',
-      as: 'organization'
-    });
-    
-    Geofence.belongsTo(models.User, {
-      foreignKey: 'createdBy',
-      as: 'creator'
-    });
-    
-    Geofence.belongsTo(models.Worksite, {
-      foreignKey: 'worksiteId',
-      as: 'worksite'
-    });
-    
-    Geofence.hasMany(models.GeoEvent, {
-      foreignKey: 'geofenceId',
-      as: 'events'
-    });
-  };
-
-  return Geofence;
-};
+export default Geofence;

@@ -21,43 +21,52 @@ const GpsDashboard = () => {
     }
   }, [view, selectedUser, selectedDate]);
 
-  const fetchLivePositions = async () => {
+  const fetchLivePositions = async (retryCount = 0) => {
     try {
       setLoading(true);
+      setError(null);
+      
+      const token = localStorage.getItem('webwork_token');
+      if (!token) {
+        setError('Authentication required. Please log in again.');
+        return;
+      }
+
       const response = await fetch('/api/gps/live', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('webwork_token')}`
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
       });
       
       if (response.ok) {
         const data = await response.json();
         setLivePositions(data.data || []);
+        setError(null);
+      } else if (response.status === 401) {
+        setError('Session expired. Please log in again.');
+        // Redirect to login
+        window.location.href = '/login';
+      } else if (response.status === 403) {
+        setError('Access denied. You do not have permission to view GPS data.');
+      } else if (response.status >= 500) {
+        if (retryCount < 3) {
+          console.log(`Retrying GPS fetch (attempt ${retryCount + 1})...`);
+          setTimeout(() => fetchLivePositions(retryCount + 1), 2000);
+          return;
+        }
+        setError('Server error. Please try again later.');
       } else {
-        // For demo purposes, show some mock data
-        setLivePositions([
-          {
-            userId: '1',
-            user: { name: 'John Doe', email: 'john@example.com' },
-            latitude: 40.7128,
-            longitude: -74.0060,
-            accuracy: 10,
-            timestamp: new Date().toISOString(),
-            isMoving: true
-          },
-          {
-            userId: '2',
-            user: { name: 'Jane Smith', email: 'jane@example.com' },
-            latitude: 40.7589,
-            longitude: -73.9851,
-            accuracy: 15,
-            timestamp: new Date(Date.now() - 30000).toISOString(),
-            isMoving: false
-          }
-        ]);
+        setError(`Failed to fetch live positions (${response.status})`);
       }
     } catch (err) {
-      setError('Failed to fetch live positions');
+      console.error('GPS fetch error:', err);
+      if (retryCount < 3) {
+        console.log(`Retrying GPS fetch due to network error (attempt ${retryCount + 1})...`);
+        setTimeout(() => fetchLivePositions(retryCount + 1), 2000);
+        return;
+      }
+      setError('Network error. Please check your connection and try again.');
     } finally {
       setLoading(false);
     }

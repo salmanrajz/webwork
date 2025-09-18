@@ -1,7 +1,9 @@
-const { DataTypes } = require('sequelize');
+import { DataTypes, Model } from 'sequelize';
+import sequelize from '../config/database.js';
 
-module.exports = (sequelize) => {
-  const GpsPoint = sequelize.define('GpsPoint', {
+class GpsPoint extends Model {}
+
+GpsPoint.init({
     id: {
       type: DataTypes.UUID,
       defaultValue: DataTypes.UUIDV4,
@@ -9,11 +11,8 @@ module.exports = (sequelize) => {
     },
     sessionId: {
       type: DataTypes.UUID,
-      allowNull: false,
-      references: {
-        model: 'sessions',
-        key: 'id'
-      }
+      allowNull: true,
+      comment: 'Optional session identifier'
     },
     userId: {
       type: DataTypes.UUID,
@@ -86,13 +85,14 @@ module.exports = (sequelize) => {
       comment: 'Additional sensor data'
     }
   }, {
+    sequelize,
     tableName: 'gps_points',
     indexes: [
       {
-        fields: ['userId', 'timestamp']
+        fields: ['user_id', 'timestamp']
       },
       {
-        fields: ['sessionId']
+        fields: ['session_id']
       },
       {
         fields: ['timestamp']
@@ -105,17 +105,4 @@ module.exports = (sequelize) => {
     timestamps: true
   });
 
-  GpsPoint.associate = (models) => {
-    GpsPoint.belongsTo(models.User, {
-      foreignKey: 'userId',
-      as: 'user'
-    });
-    
-    GpsPoint.belongsTo(models.Session, {
-      foreignKey: 'sessionId',
-      as: 'session'
-    });
-  };
-
-  return GpsPoint;
-};
+export default GpsPoint;

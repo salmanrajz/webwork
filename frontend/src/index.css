@@ -9,6 +9,9 @@ body {
 /* Dark mode support */
 html.dark {
   color-scheme: dark;
+  --tooltip-bg: #1e293b;
+  --tooltip-border: #334155;
+  --tooltip-text: #f1f5f9;
 }
 
 /* Custom scrollbar for dark mode */

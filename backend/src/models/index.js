@@ -10,7 +10,7 @@ import Shift from './Shift.js';
 import Attendance from './Attendance.js';
 import RestrictionRule from './RestrictionRule.js';
 import RestrictionViolation from './RestrictionViolation.js';
-// GPS models will be added when database is set up
+// GPS models - temporarily disabled due to missing dependencies
 // import GpsPoint from './GpsPoint.js';
 // import Geofence from './Geofence.js';
 // import GeoEvent from './GeoEvent.js';
@@ -89,7 +89,8 @@ User.hasMany(RestrictionViolation, { as: 'acknowledgedViolations', foreignKey: '
 RestrictionViolation.belongsTo(User, { as: 'overrideByUser', foreignKey: 'overrideBy' });
 User.hasMany(RestrictionViolation, { as: 'overrideViolations', foreignKey: 'overrideBy' });
 
-// GPS associations will be added when models are properly set up
+// GPS associations
+// Note: GPS models use factory pattern, associations will be set up in app.js
 
 export {
   User,
@@ -104,4 +105,9 @@ export {
   Attendance,
   RestrictionRule,
   RestrictionViolation
+  // GPS models temporarily disabled
+  // GpsPoint,
+  // Geofence,
+  // GeoEvent,
+  // OrganizationSettings
 };

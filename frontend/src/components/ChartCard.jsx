@@ -25,10 +25,10 @@ const ChartCard = ({ title, subtitle, data = [], dataKey = 'minutes', type = 'li
               cursor={{ fill: '#f1f5f9' }} 
               formatter={(value) => [`${value} min`, 'Minutes']}
               contentStyle={{
-                backgroundColor: '#ffffff',
-                border: '1px solid #e2e8f0',
+                backgroundColor: 'var(--tooltip-bg, #ffffff)',
+                border: '1px solid var(--tooltip-border, #e2e8f0)',
                 borderRadius: '8px',
-                color: '#1e293b'
+                color: 'var(--tooltip-text, #1e293b)'
               }}
             />
             <Bar dataKey={dataKey} fill="#2563eb" radius={[6, 6, 0, 0]} />
@@ -42,10 +42,10 @@ const ChartCard = ({ title, subtitle, data = [], dataKey = 'minutes', type = 'li
               cursor={{ stroke: '#2563eb', strokeWidth: 2 }} 
               formatter={(value) => [`${value} min`, 'Minutes']}
               contentStyle={{
-                backgroundColor: '#ffffff',
-                border: '1px solid #e2e8f0',
+                backgroundColor: 'var(--tooltip-bg, #ffffff)',
+                border: '1px solid var(--tooltip-border, #e2e8f0)',
                 borderRadius: '8px',
-                color: '#1e293b'
+                color: 'var(--tooltip-text, #1e293b)'
               }}
             />
             <Line type="monotone" dataKey={dataKey} stroke="#2563eb" strokeWidth={2} dot={false} />

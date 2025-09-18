@@ -1,9 +1,12 @@
 console.log('🔧 Starting WebWork Tracker Desktop App...');
 
 // Import Electron modules
-const { app, BrowserWindow, ipcMain, powerMonitor, Tray, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, powerMonitor, Tray, Menu, nativeImage } = require('electron');
 console.log('✅ Electron modules imported successfully');
+
+// App object will be available when Electron initializes
 const path = require('path');
+const fs = require('fs');
 const axios = require('axios');
 const FormData = require('form-data');
 const screenshotDesktop = require('screenshot-desktop');
@@ -736,36 +739,58 @@ const stopTracking = () => {
   stopRealtimeMonitoring();
 };
 
-const createTray = () => {
-  // Create system tray - use appropriate format for platform
-  let trayIcon;
-  
-  if (process.platform === 'darwin') {
-    // macOS - use PNG format
-    trayIcon = path.join(__dirname, '..', 'build', 'icon.png');
-  } else {
-    // Windows/Linux - use ICO format
-    trayIcon = path.join(__dirname, '..', 'build', 'icon.ico');
-  }
-  
-  try {
-    tray = new Tray(trayIcon);
-    console.log('✅ System tray icon loaded successfully');
-  } catch (error) {
-    console.warn('⚠️ Could not load tray icon:', error.message);
-    
-    // Try fallback icon format
-    const fallbackIcon = process.platform === 'darwin' 
-      ? path.join(__dirname, '..', 'build', 'icon.ico')
-      : path.join(__dirname, '..', 'build', 'icon.png');
-    
-    try {
-      tray = new Tray(fallbackIcon);
-      console.log('✅ System tray icon loaded with fallback format');
-    } catch (fallbackError) {
-      console.error('❌ Failed to create system tray:', fallbackError.message);
-      return; // Skip tray creation if it fails completely
+// Resolve the correct tray icon for the current platform/build
+const resolveTrayImage = () => {
+  const baseDir = app.isPackaged ? process.resourcesPath : path.join(__dirname, '..');
+  const buildDir = path.join(baseDir, 'build');
+  const candidates = process.platform === 'darwin'
+    ? ['iconTemplate.png', 'icon.png', 'iconTemplate@2x.png', 'icon.ico']
+    : ['icon.ico', 'icon.png'];
+
+  for (const fileName of candidates) {
+    const candidatePath = path.join(buildDir, fileName);
+
+    if (!fs.existsSync(candidatePath)) {
+      continue;
     }
+
+    let image = nativeImage.createFromPath(candidatePath);
+
+    if (image.isEmpty()) {
+      if (ENABLE_CONSOLE_LOGS) {
+        console.warn('⚠️ Tray icon candidate is empty:', candidatePath);
+      }
+      continue;
+    }
+
+    if (process.platform === 'darwin') {
+      image = image.resize({ width: 18, height: 18, quality: 'best' });
+      image.setTemplateImage(true);
+    }
+
+    return { image, path: candidatePath };
+  }
+
+  return null;
+};
+
+const createTray = () => {
+  const resolvedIcon = resolveTrayImage();
+
+  if (!resolvedIcon) {
+    console.error('❌ Failed to locate a tray icon asset.');
+    return;
+  }
+
+  try {
+    tray = new Tray(resolvedIcon.image);
+    if (ENABLE_CONSOLE_LOGS) {
+      console.log('✅ System tray icon loaded from:', resolvedIcon.path);
+    }
+  } catch (error) {
+    console.error('❌ Failed to create system tray:', error.message);
+    tray = null;
+    return;
   }
   
   // Only create menu if tray was successfully created
@@ -859,21 +884,24 @@ const createWindow = () => {
   mainWindow.removeMenu();
   
   // Handle permission requests
-  mainWindow.webContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
+  const allowedPermissions = new Set(['geolocation', 'notifications']);
+
+  mainWindow.webContents.session.setPermissionRequestHandler((_webContents, permission, callback) => {
     console.log('🔐 Permission requested:', permission);
-    if (permission === 'geolocation') {
-      console.log('✅ Allowing geolocation permission');
+    if (allowedPermissions.has(permission)) {
+      console.log(`✅ Allowing ${permission} permission`);
       callback(true);
-    } else {
-      callback(false);
+      return;
     }
+
+    callback(false);
   });
   
   // Set permission check handler
-  mainWindow.webContents.session.setPermissionCheckHandler((webContents, permission, requestingOrigin, details) => {
+  mainWindow.webContents.session.setPermissionCheckHandler((_webContents, permission) => {
     console.log('🔍 Permission check:', permission);
-    if (permission === 'geolocation') {
-      console.log('✅ Geolocation permission granted');
+    if (allowedPermissions.has(permission)) {
+      console.log(`✅ ${permission.charAt(0).toUpperCase() + permission.slice(1)} permission granted`);
       return true;
     }
     return false;
@@ -882,12 +910,7 @@ const createWindow = () => {
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 };
 
-// Check if app is available (running in Electron context)
-if (!app) {
-  console.error('❌ Electron app object not available. Make sure to run with: npm start');
-  process.exit(1);
-}
-
+// Initialize app when ready
 app.whenReady().then(async () => {
   // Check macOS permissions on startup
   if (process.platform === 'darwin') {
@@ -938,11 +961,21 @@ ipcMain.handle('auth:login', async (_event, credentials) => {
   return data.data;
 });
 
-// GPS data handler
-ipcMain.handle('gps:sendData', async (_event, gpsData) => {
+// GPS data handler with retry logic
+ipcMain.handle('gps:sendData', async (_event, gpsData, retryCount = 0) => {
   try {
     if (ENABLE_CONSOLE_LOGS) {
       console.log('📍 GPS data received:', gpsData.latitude, gpsData.longitude);
+    }
+
+    // Validate GPS data
+    if (!gpsData.latitude || !gpsData.longitude) {
+      throw new Error('Invalid GPS data: missing coordinates');
+    }
+
+    const token = gpsData.token || activityContext?.token;
+    if (!token) {
+      throw new Error('No authentication token available');
     }
 
     // Send GPS data to backend
@@ -951,8 +984,10 @@ ipcMain.handle('gps:sendData', async (_event, gpsData) => {
       sessionId: gpsData.sessionId
     }, {
       headers: {
-        'Authorization': `Bearer ${gpsData.token || activityContext?.token}`
-      }
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      timeout: 10000 // 10 second timeout
     });
 
     if (ENABLE_CONSOLE_LOGS) {
@@ -961,9 +996,32 @@ ipcMain.handle('gps:sendData', async (_event, gpsData) => {
 
     return { success: true };
   } catch (error) {
-    if (ENABLE_CONSOLE_LOGS) {
-      console.warn('⚠️ Failed to send GPS data:', error.message);
+    console.error('⚠️ Failed to send GPS data:', error.message);
+    
+    // Retry logic for network errors
+    if (retryCount < 3 && (
+      error.code === 'ECONNREFUSED' || 
+      error.code === 'ENOTFOUND' || 
+      error.code === 'ETIMEDOUT' ||
+      error.response?.status >= 500
+    )) {
+      console.log(`🔄 Retrying GPS data send (attempt ${retryCount + 1})...`);
+      await new Promise(resolve => setTimeout(resolve, 2000 * (retryCount + 1))); // Exponential backoff
+      return ipcMain.handle('gps:sendData', _event, gpsData, retryCount + 1);
     }
+
+    // Handle specific error types
+    if (error.response?.status === 401) {
+      console.error('🔐 Authentication failed - GPS data not sent');
+      return { success: false, error: 'Authentication failed', requiresReauth: true };
+    } else if (error.response?.status === 403) {
+      console.error('🚫 Access denied - GPS data not sent');
+      return { success: false, error: 'Access denied' };
+    } else if (error.code === 'ECONNREFUSED') {
+      console.error('🌐 Backend server not available');
+      return { success: false, error: 'Backend server not available' };
+    }
+
     return { success: false, error: error.message };
   }
 });

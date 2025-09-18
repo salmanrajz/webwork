@@ -1,7 +1,9 @@
-const { DataTypes } = require('sequelize');
+import { DataTypes, Model } from 'sequelize';
+import sequelize from '../config/database.js';
 
-module.exports = (sequelize) => {
-  const OrganizationSettings = sequelize.define('OrganizationSettings', {
+class OrganizationSettings extends Model {}
+
+OrganizationSettings.init({
     id: {
       type: DataTypes.UUID,
       defaultValue: DataTypes.UUIDV4,
@@ -93,16 +95,9 @@ module.exports = (sequelize) => {
       comment: 'Compliance and legal settings'
     }
   }, {
+    sequelize,
     tableName: 'organization_settings',
     timestamps: true
   });
 
-  OrganizationSettings.associate = (models) => {
-    OrganizationSettings.belongsTo(models.Organization, {
-      foreignKey: 'organizationId',
-      as: 'organization'
-    });
-  };
-
-  return OrganizationSettings;
-};
+export default OrganizationSettings;
