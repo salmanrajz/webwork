@@ -1,3 +1,115 @@
+const strings = {
+  en: {
+    notifications: {
+      disabledWarning: 'Notifications are disabled. Some alerts may not be visible.',
+      retry: 'Retry',
+      openSettings: 'Open Settings'
+    },
+    permissions: {
+      title: 'Permissions Required',
+      subtitle: 'We need a few system permissions to keep WebWork Tracker running smoothly.',
+      openSettingsMac: 'Open System Preferences',
+      openSettingsWindows: 'Open Windows Settings',
+      refresh: 'Refresh Status',
+      mac: {
+        accessibility: {
+          title: 'Enable Accessibility access',
+          steps: [
+            'Open System Settings > Privacy & Security > Accessibility.',
+            'Select the lock icon and authenticate if required.',
+            'Enable WebWork Tracker Desktop.'
+          ]
+        },
+        screenRecording: {
+          title: 'Enable Screen Recording access',
+          steps: [
+            'Open System Settings > Privacy & Security > Screen Recording.',
+            'Select the lock icon and authenticate if required.',
+            'Enable WebWork Tracker Desktop and restart the app if prompted.'
+          ]
+        },
+        automation: {
+          title: 'Allow Automation control',
+          steps: [
+            'Open System Settings > Privacy & Security > Automation.',
+            'Locate WebWork Tracker Desktop.',
+            'Enable automation permissions for supported browsers.'
+          ]
+        },
+        location: {
+          title: 'Enable Location Services',
+          steps: [
+            'Open System Settings > Privacy & Security > Location Services.',
+            'Ensure Location Services are enabled.',
+            'Allow WebWork Tracker Desktop to access your location.'
+          ]
+        }
+      },
+      windows: {
+        location: {
+          title: 'Enable Windows Location Services',
+          steps: [
+            'Open Windows Settings > Privacy & security > Location.',
+            'Turn on Location Services.',
+            'Under “Let apps access your location”, enable WebWork Tracker Desktop.'
+          ]
+        }
+      },
+      browser: {
+        location: {
+          title: 'Allow browser location access',
+          steps: [
+            'When prompted, allow this app to access your location.',
+            'If previously denied, reset the permission from your browser settings and reload the app.'
+          ]
+        }
+      }
+    },
+    consent: {
+      title: 'Before we begin',
+      description: 'WebWork Tracker captures screenshots, activity metrics, and location data during work hours. Please review and accept to continue.',
+      screenshots: 'Screenshots of your primary display may be captured while the tracker runs.',
+      activity: 'Keyboard and mouse activity counts are recorded—never full keystrokes.',
+      location: 'If enabled by your organization, location tracking runs only during active sessions.',
+      links: 'Review our <a href="/privacy-policy" target="_blank" rel="noreferrer">Privacy Policy</a> and <a href="/terms-of-service" target="_blank" rel="noreferrer">Terms of Service</a>.',
+      acknowledge: 'I understand and agree to the monitoring described above.',
+      decline: 'Decline',
+      accept: 'Accept & Continue'
+    }
+  }
+};
+
+const locale = 'en';
+
+const translate = (key) => {
+  const segments = key.split('.');
+  let current = strings[locale];
+  for (const segment of segments) {
+    if (current && Object.prototype.hasOwnProperty.call(current, segment)) {
+      current = current[segment];
+    } else {
+      return null;
+    }
+  }
+  return current;
+};
+
+const applyTranslations = () => {
+  document.querySelectorAll('[data-i18n]').forEach((element) => {
+    const key = element.getAttribute('data-i18n');
+    const value = translate(key);
+    if (typeof value === 'string') {
+      if (value.includes('<')) {
+        element.innerHTML = value;
+      } else {
+        element.textContent = value;
+      }
+    }
+  });
+};
+
+applyTranslations();
+
 const authSection = document.getElementById('auth');
 const trackerSection = document.getElementById('tracker');
 const loginForm = document.getElementById('login-form');
@@ -37,6 +149,18 @@ const pauseBtn = document.getElementById('pause');
 const resumeBtn = document.getElementById('resume');
 const stopBtn = document.getElementById('stop');
 const eventLog = document.getElementById('event-log');
+const notificationBanner = document.getElementById('notification-permission-banner');
+const recheckNotificationPermissionBtn = document.getElementById('recheck-notification-permission');
+const openNotificationSettingsBtn = document.getElementById('open-notification-settings');
+const permissionModal = document.getElementById('permission-modal');
+const permissionSteps = document.getElementById('permission-steps');
+const openSystemPreferencesBtn = document.getElementById('open-system-preferences');
+const refreshPermissionStatusBtn = document.getElementById('refresh-permission-status');
+const closePermissionModalBtn = document.getElementById('close-permission-modal');
+const consentModal = document.getElementById('consent-modal');
+const consentCheckbox = document.getElementById('consent-checkbox');
+const consentAcceptBtn = document.getElementById('consent-accept');
+const consentDeclineBtn = document.getElementById('consent-decline');
 
 const state = {
   token: null,
@@ -52,6 +176,19 @@ const state = {
   },
   notifications: [],
   isConnected: false,
+  permissions: {
+    status: null,
+    missing: [],
+    dismissed: false
+  },
+  consent: {
+    accepted: false,
+    storageKey: null
+  },
+  browser: {
+    locationPermission: 'prompt',
+    notificationPermission: typeof Notification !== 'undefined' ? Notification.permission : 'default'
+  },
   gps: {
     enabled: false,
     permission: 'prompt', // 'granted', 'denied', 'prompt'
@@ -116,6 +253,226 @@ const updateNotificationDisplay = () => {
   }
 };
 
+const computeMissingPermissions = (status) => {
+  const missing = [];
+  if (!status) {
+    return missing;
+  }
+
+  if (status.macOS) {
+    const macDetails = status.macOS;
+    if (macDetails.accessibility === false) {
+      const details = translate('permissions.mac.accessibility');
+      missing.push({
+        scope: 'mac',
+        systemTarget: 'accessibility',
+        title: details?.title || 'Enable Accessibility access',
+        steps: details?.steps || []
+      });
+    }
+    if (macDetails.screenRecording === false) {
+      const details = translate('permissions.mac.screenRecording');
+      missing.push({
+        scope: 'mac',
+        systemTarget: 'screenRecording',
+        title: details?.title || 'Enable Screen Recording access',
+        steps: details?.steps || []
+      });
+    }
+    if (macDetails.automation === false) {
+      const details = translate('permissions.mac.automation');
+      missing.push({
+        scope: 'mac',
+        systemTarget: 'automation',
+        title: details?.title || 'Allow Automation control',
+        steps: details?.steps || []
+      });
+    }
+    if (macDetails.location === false) {
+      const details = translate('permissions.mac.location');
+      missing.push({
+        scope: 'mac',
+        systemTarget: 'location',
+        title: details?.title || 'Enable Location Services',
+        steps: details?.steps || []
+      });
+    }
+  }
+
+  if (status.windows && status.windows.enabled === false) {
+    const details = translate('permissions.windows.location');
+    missing.push({
+      scope: 'windows',
+      systemTarget: 'location',
+      title: details?.title || 'Enable Windows Location Services',
+      steps: details?.steps || []
+    });
+  }
+
+  if (state.browser.locationPermission === 'denied') {
+    const details = translate('permissions.browser.location');
+    missing.push({
+      scope: 'browser',
+      systemTarget: 'location',
+      title: details?.title || 'Allow browser location access',
+      steps: details?.steps || []
+    });
+  }
+
+  return missing;
+};
+
+const renderPermissionModal = () => {
+  if (!permissionModal) return;
+
+  const missing = state.permissions.missing;
+
+  if (!missing.length) {
+    permissionModal.classList.add('hidden');
+    state.permissions.dismissed = false;
+    return;
+  }
+
+  if (state.permissions.dismissed) {
+    return;
+  }
+
+  const sections = missing
+    .map((item) => {
+      const steps = item.steps || [];
+      const list = steps
+        .map((step) => `<li>${step}</li>`)
+        .join('');
+      return `<section class="permission-step"><h4>${item.title}</h4><ol>${list}</ol></section>`;
+    })
+    .join('');
+
+  permissionSteps.innerHTML = sections;
+
+  const platform = state.permissions.status?.platform;
+  const platformTextKey = platform === 'win32' ? 'permissions.openSettingsWindows' : 'permissions.openSettingsMac';
+  const openText = translate(platformTextKey) || 'Open Settings';
+
+  const systemTargets = missing.filter((item) => Boolean(item.systemTarget));
+  if (systemTargets.length) {
+    openSystemPreferencesBtn.dataset.target = systemTargets[0].systemTarget;
+    openSystemPreferencesBtn.disabled = false;
+    openSystemPreferencesBtn.textContent = openText;
+  } else {
+    openSystemPreferencesBtn.dataset.target = '';
+    openSystemPreferencesBtn.disabled = true;
+    openSystemPreferencesBtn.textContent = openText;
+  }
+
+  refreshPermissionStatusBtn.textContent = translate('permissions.refresh') || 'Refresh Status';
+  permissionModal.classList.remove('hidden');
+};
+
+const updatePermissionStatus = (status) => {
+  state.permissions.status = status || {};
+  state.permissions.missing = computeMissingPermissions(status);
+  if (state.permissions.missing.length > 0) {
+    state.permissions.dismissed = false;
+  }
+  renderPermissionModal();
+};
+
+const evaluateBrowserLocationPermission = async () => {
+  if (!navigator.permissions || !navigator.permissions.query) {
+    return;
+  }
+
+  try {
+    const result = await navigator.permissions.query({ name: 'geolocation' });
+    const updateState = () => {
+      state.browser.locationPermission = result.state;
+      updatePermissionStatus(state.permissions.status);
+    };
+    updateState();
+    result.onchange = updateState;
+  } catch (error) {
+    logEvent(`Unable to check browser location permission: ${error.message}`);
+  }
+};
+
+const initializePermissionFlows = async () => {
+  if (window.desktop?.onPermissionStatus) {
+    window.desktop.onPermissionStatus((status) => {
+      updatePermissionStatus(status);
+    });
+    try {
+      const status = await window.desktop.getPermissionStatus();
+      updatePermissionStatus(status);
+    } catch (error) {
+      logEvent(`Failed to retrieve permission status: ${error.message}`);
+    }
+  }
+
+  await evaluateBrowserLocationPermission();
+  updateNotificationBanner();
+};
+
+const resolveConsentStorageKey = () => {
+  if (state.user?.id) {
+    return `webwork_tracker_consent_${state.user.id}`;
+  }
+  return 'webwork_tracker_consent_anonymous';
+};
+
+const persistConsentAcceptance = () => {
+  if (!state.consent.storageKey) return;
+  const payload = {
+    accepted: true,
+    timestamp: new Date().toISOString()
+  };
+  localStorage.setItem(state.consent.storageKey, JSON.stringify(payload));
+};
+
+const loadConsentPreference = () => {
+  if (!consentModal) return;
+
+  state.consent.storageKey = resolveConsentStorageKey();
+  let stored = null;
+  try {
+    stored = JSON.parse(localStorage.getItem(state.consent.storageKey) || 'null');
+  } catch (error) {
+    stored = null;
+  }
+
+  state.consent.accepted = stored?.accepted === true;
+
+  if (consentCheckbox) {
+    consentCheckbox.checked = state.consent.accepted;
+  }
+  if (consentAcceptBtn) {
+    consentAcceptBtn.disabled = !state.consent.accepted;
+  }
+
+  if (state.consent.accepted) {
+    consentModal.classList.add('hidden');
+  } else {
+    consentModal.classList.remove('hidden');
+  }
+};
+
+const ensureConsentGranted = () => {
+  if (state.consent.accepted) {
+    return true;
+  }
+
+  if (!state.consent.storageKey) {
+    loadConsentPreference();
+  }
+
+  if (!state.consent.accepted) {
+    consentModal.classList.remove('hidden');
+    logEvent('Tracking requires consent. Please review the monitoring notice.');
+    return false;
+  }
+
+  return true;
+};
+
 const getNotificationIcon = (type) => {
   const icons = {
     info: 'ℹ️',
@@ -128,12 +485,34 @@ const getNotificationIcon = (type) => {
   return icons[type] || '📢';
 };
 
-const requestNotificationPermission = async () => {
-  if ('Notification' in window && Notification.permission === 'default') {
-    const permission = await Notification.requestPermission();
-    return permission === 'granted';
+const updateNotificationBanner = () => {
+  if (!notificationBanner || !('Notification' in window)) return;
+  const shouldShow = Notification.permission === 'denied';
+  if (shouldShow) {
+    notificationBanner.classList.remove('hidden');
+  } else {
+    notificationBanner.classList.add('hidden');
   }
-  return Notification.permission === 'granted';
+};
+
+const requestNotificationPermission = async (forcePrompt = false) => {
+  if (!('Notification' in window)) {
+    return false;
+  }
+
+  let currentPermission = Notification.permission;
+
+  if (currentPermission === 'default' || (forcePrompt && currentPermission !== 'granted')) {
+    try {
+      currentPermission = await Notification.requestPermission();
+    } catch (error) {
+      logEvent(`Notification permission request failed: ${error.message}`);
+    }
+  }
+
+  state.browser.notificationPermission = currentPermission;
+  updateNotificationBanner();
+  return currentPermission === 'granted';
 };
 
 const isProduction = false; // Always show logs in development
@@ -273,6 +652,8 @@ loginForm.addEventListener('submit', async (event) => {
     await refreshTasks();
     await loadActiveLog();
     await loadAttendance();
+    state.permissions.dismissed = false;
+    loadConsentPreference();
     logEvent('Signed in successfully.');
   } catch (error) {
     console.error(error);
@@ -301,7 +682,86 @@ logoutButton.addEventListener('click', async () => {
   setStatus('Idle', '');
   setButtonsState({ running: false });
   setAttendanceDisplay();
+  state.consent.storageKey = null;
+  state.consent.accepted = false;
+  if (consentCheckbox) {
+    consentCheckbox.checked = false;
+  }
 });
+
+if (consentCheckbox && consentAcceptBtn) {
+  consentCheckbox.addEventListener('change', () => {
+    consentAcceptBtn.disabled = !consentCheckbox.checked;
+  });
+}
+
+if (consentAcceptBtn) {
+  consentAcceptBtn.addEventListener('click', () => {
+    state.consent.accepted = true;
+    persistConsentAcceptance();
+    consentModal.classList.add('hidden');
+  });
+}
+
+if (consentDeclineBtn) {
+  consentDeclineBtn.addEventListener('click', () => {
+    state.consent.accepted = false;
+    if (consentCheckbox) {
+      consentCheckbox.checked = false;
+    }
+    if (consentAcceptBtn) {
+      consentAcceptBtn.disabled = true;
+    }
+    consentModal.classList.add('hidden');
+  });
+}
+
+if (recheckNotificationPermissionBtn) {
+  recheckNotificationPermissionBtn.addEventListener('click', () => {
+    requestNotificationPermission(true);
+  });
+}
+
+if (openNotificationSettingsBtn) {
+  openNotificationSettingsBtn.addEventListener('click', async () => {
+    await window.desktop.openSystemSettings({
+      target: 'notifications',
+      platform: state.permissions.status?.platform
+    });
+  });
+}
+
+if (refreshPermissionStatusBtn) {
+  refreshPermissionStatusBtn.addEventListener('click', async () => {
+    try {
+      const status = await window.desktop.refreshPermissionStatus();
+      updatePermissionStatus(status);
+    } catch (error) {
+      logEvent(`Failed to refresh permissions: ${error.message}`);
+    }
+  });
+}
+
+if (openSystemPreferencesBtn) {
+  openSystemPreferencesBtn.addEventListener('click', async () => {
+    const target = openSystemPreferencesBtn.dataset.target;
+    if (!target) return;
+    const result = await window.desktop.openSystemSettings({
+      target,
+      platform: state.permissions.status?.platform
+    });
+    if (!result?.success && result?.error) {
+      logEvent(`Unable to open system settings: ${result.error}`);
+    }
+  });
+}
+
+if (closePermissionModalBtn) {
+  closePermissionModalBtn.addEventListener('click', () => {
+    state.permissions.dismissed = true;
+    permissionModal.classList.add('hidden');
+  });
+}
 
 clockToggleBtn.addEventListener('click', async () => {
   if (!state.token) return;
@@ -342,6 +802,7 @@ clockToggleBtn.addEventListener('click', async () => {
 
 startBtn.addEventListener('click', async () => {
   if (!state.token || !taskSelect.value) return;
+  if (!ensureConsentGranted()) return;
   try {
     await ensureClockedIn();
     const log = await window.desktop.startTimer({ token: state.token, taskId: taskSelect.value });
@@ -411,6 +872,7 @@ pauseBtn.addEventListener('click', async () => {
 
 resumeBtn.addEventListener('click', async () => {
   if (!state.token || !taskSelect.value) return;
+  if (!ensureConsentGranted()) return;
   try {
     await ensureClockedIn();
     const log = await window.desktop.resumeTimer({ token: state.token, taskId: taskSelect.value });
@@ -534,11 +996,13 @@ const restoreSession = async () => {
     state.token = token;
     state.user = JSON.parse(user);
     userName.textContent = `${state.user.firstName} ${state.user.lastName}`;
-    userRole.textContent = state.user.role.toUpperCase();
+   userRole.textContent = state.user.role.toUpperCase();
     toggleTracker(true);
     await refreshTasks();
     await loadActiveLog();
     await loadAttendance();
+    state.permissions.dismissed = false;
+    loadConsentPreference();
     logEvent('Session restored.');
   } catch (error) {
     console.error('Failed to restore session', error);
@@ -726,6 +1190,7 @@ window.desktop.onStatus((payload) => {
 setButtonsState({ running: false });
 applyTheme(state.theme);
 restoreSession();
+initializePermissionFlows();
 
 // Request notification permission on startup
 requestNotificationPermission();

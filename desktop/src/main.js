@@ -1,12 +1,14 @@
 console.log('🔧 Starting WebWork Tracker Desktop App...');
 
 // Import Electron modules
-const { app, BrowserWindow, ipcMain, powerMonitor, Tray, Menu, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, powerMonitor, Tray, Menu, nativeImage, shell } = require('electron');
 console.log('✅ Electron modules imported successfully');
 
 // App object will be available when Electron initializes
 const path = require('path');
 const fs = require('fs');
+const { exec } = require('child_process');
+const { promisify } = require('util');
 const axios = require('axios');
 const FormData = require('form-data');
 const screenshotDesktop = require('screenshot-desktop');
@@ -16,6 +18,8 @@ const si = require('systeminformation');
 let activeWinModule;
 let uIOhook;
 let inputHooksAvailable = false;
+
+const execAsync = promisify(exec);
 
 try {
   ({ uIOhook } = require('uiohook-napi'));
@@ -327,26 +331,25 @@ const startScreenshotCapture = (context) => {
 
 // macOS Permissions Check
 const checkMacOSPermissions = async () => {
-  if (process.platform !== 'darwin') return true;
-  
+  if (process.platform !== 'darwin') return null;
+
   const permissions = {
-    accessibility: false,
-    screenRecording: false,
-    automation: false
+    accessibility: !MACOS_ACCESSIBILITY_REQUIRED,
+    screenRecording: !MACOS_SCREEN_RECORDING_REQUIRED,
+    automation: !MACOS_AUTOMATION_REQUIRED,
+    location: 'unknown'
   };
-  
+
   try {
-    // Test accessibility permission
     if (MACOS_ACCESSIBILITY_REQUIRED) {
       try {
         const testWindow = await getActiveWindow();
-        permissions.accessibility = testWindow && testWindow.title !== 'Unknown Window';
+        permissions.accessibility = Boolean(testWindow && testWindow.title !== 'Unknown Window');
       } catch (error) {
         permissions.accessibility = false;
       }
     }
-    
-    // Test screen recording permission
+
     if (MACOS_SCREEN_RECORDING_REQUIRED) {
       try {
         await screenshotDesktop();
@@ -355,21 +358,16 @@ const checkMacOSPermissions = async () => {
         permissions.screenRecording = false;
       }
     }
-    
-    // Test automation permission (AppleScript)
+
     if (MACOS_AUTOMATION_REQUIRED && APPLESCRIPT_ENABLED) {
       try {
-        const { exec } = require('child_process');
-        const { promisify } = require('util');
-        const execAsync = promisify(exec);
-        
         await execAsync('osascript -e "tell application \\"System Events\\" to get name of first process"');
         permissions.automation = true;
       } catch (error) {
         permissions.automation = false;
       }
     }
-    
+
     return permissions;
   } catch (error) {
     if (ENABLE_CONSOLE_LOGS) {
@@ -377,6 +375,49 @@ const checkMacOSPermissions = async () => {
     }
     return permissions;
   }
+};
+
+const checkWindowsLocationPermission = async () => {
+  if (process.platform !== 'win32') return null;
+
+  const status = {
+    supported: true,
+    enabled: null,
+    error: null
+  };
+
+  try {
+    const { stdout } = await execAsync('powershell -Command "(Get-ItemProperty -Path \'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\lfsvc\\Service\\Configuration\').Status"');
+    const value = parseInt(stdout.trim(), 10);
+    if (!Number.isNaN(value)) {
+      status.enabled = value === 1;
+    }
+  } catch (error) {
+    status.error = error.message;
+  }
+
+  return status;
+};
+
+const gatherPermissionStatus = async () => {
+  const [macOS, windows] = await Promise.all([
+    checkMacOSPermissions(),
+    checkWindowsLocationPermission()
+  ]);
+
+  return {
+    platform: process.platform,
+    macOS,
+    windows
+  };
+};
+
+const sendPermissionStatusToRenderer = async () => {
+  cachedPermissionStatus = await gatherPermissionStatus();
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('permissions:status', cachedPermissionStatus);
+  }
+  return cachedPermissionStatus;
 };
 
 const getActiveWindow = async () => {
@@ -739,6 +780,8 @@ const stopTracking = () => {
   stopRealtimeMonitoring();
 };
 
+let cachedPermissionStatus = null;
+
 // Resolve the correct tray icon for the current platform/build
 const resolveTrayImage = () => {
   const baseDir = app.isPackaged ? process.resourcesPath : path.join(__dirname, '..');
@@ -906,34 +949,21 @@ const createWindow = () => {
     }
     return false;
   });
-  
+
+  mainWindow.webContents.on('did-finish-load', () => {
+    sendPermissionStatusToRenderer();
+  });
+
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 };
 
 // Initialize app when ready
 app.whenReady().then(async () => {
-  // Check macOS permissions on startup
-  if (process.platform === 'darwin') {
-    const permissions = await checkMacOSPermissions();
-    
-    if (ENABLE_CONSOLE_LOGS) {
-      console.log('🔐 macOS Permissions Status:');
-      console.log(`  Accessibility: ${permissions.accessibility ? '✅' : '❌'}`);
-      console.log(`  Screen Recording: ${permissions.screenRecording ? '✅' : '❌'}`);
-      console.log(`  Automation: ${permissions.automation ? '✅' : '❌'}`);
-      
-      if (!permissions.accessibility && MACOS_ACCESSIBILITY_REQUIRED) {
-        console.warn('⚠️ Accessibility permission required for window detection');
-      }
-      if (!permissions.screenRecording && MACOS_SCREEN_RECORDING_REQUIRED) {
-        console.warn('⚠️ Screen Recording permission required for screenshots');
-      }
-      if (!permissions.automation && MACOS_AUTOMATION_REQUIRED) {
-        console.warn('⚠️ Automation permission required for enhanced browser detection');
-      }
-    }
+  if (ENABLE_CONSOLE_LOGS) {
+    cachedPermissionStatus = await gatherPermissionStatus();
+    console.log('🔐 Initial permission status:', cachedPermissionStatus);
   }
-  
+
   createTray();
   createWindow();
   
@@ -959,6 +989,58 @@ app.on('before-quit', () => {
 ipcMain.handle('auth:login', async (_event, credentials) => {
   const { data } = await api.post('/auth/login', credentials);
   return data.data;
+});
+
+ipcMain.handle('permissions:getStatus', async () => {
+  if (!cachedPermissionStatus) {
+    return await sendPermissionStatusToRenderer();
+  }
+  return cachedPermissionStatus;
+});
+
+ipcMain.handle('permissions:refresh', async () => {
+  return await sendPermissionStatusToRenderer();
+});
+
+ipcMain.handle('permissions:openSystem', async (_event, { platform: targetPlatform, target }) => {
+  const platform = targetPlatform || process.platform;
+
+  try {
+    if (platform === 'darwin') {
+      const preferenceMap = {
+        accessibility: 'com.apple.preference.security?Privacy_Accessibility',
+        screenRecording: 'com.apple.preference.security?Privacy_ScreenCapture',
+        automation: 'com.apple.preference.security?Privacy_Automation',
+        location: 'com.apple.preference.security?Privacy_LocationServices',
+        notifications: 'com.apple.preference.notifications'
+      };
+
+      const preference = preferenceMap[target];
+      if (!preference) {
+        throw new Error(`Unsupported macOS preference target: ${target}`);
+      }
+
+      await execAsync(`open "x-apple.systempreferences:${preference}"`);
+      return { success: true };
+    }
+
+    if (platform === 'win32') {
+      if (target === 'location') {
+        await shell.openExternal('ms-settings:privacy-location');
+        return { success: true };
+      }
+      if (target === 'notifications') {
+        await shell.openExternal('ms-settings:notifications');
+        return { success: true };
+      }
+      throw new Error(`Unsupported Windows settings target: ${target}`);
+    }
+
+    throw new Error(`Unsupported platform: ${platform}`);
+  } catch (error) {
+    console.error('⚠️ Failed to open system settings:', error.message);
+    return { success: false, error: error.message };
+  }
 });
 
 // GPS data handler with retry logic

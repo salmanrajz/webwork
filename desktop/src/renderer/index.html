@@ -7,6 +7,15 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
+    <div id="notification-permission-banner" class="hidden banner warning" role="alert">
+      <div class="banner-content">
+        <span data-i18n="notifications.disabledWarning">Notifications are disabled. Some alerts may not be visible.</span>
+        <div class="banner-actions">
+          <button id="recheck-notification-permission" class="btn btn-secondary" data-i18n="notifications.retry" type="button">Retry</button>
+          <button id="open-notification-settings" class="btn btn-tertiary" data-i18n="notifications.openSettings" type="button">Open Settings</button>
+        </div>
+      </div>
+    </div>
     <main id="app">
       <section id="auth">
         <h1>WebWork Tracker</h1>
@@ -157,6 +166,54 @@
           <div id="notifications-list" class="notifications-list">
             <p class="no-notifications">No notifications yet</p>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Permission Guidance Modal -->
+    <div id="permission-modal" class="modal hidden" role="dialog" aria-labelledby="permission-modal-title">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 id="permission-modal-title" data-i18n="permissions.title">Permissions Required</h3>
+          <button id="close-permission-modal" class="close-btn" aria-label="Close">✕</button>
+        </div>
+        <div class="modal-body">
+          <p class="modal-intro" data-i18n="permissions.subtitle">We need a few system permissions to keep WebWork Tracker running smoothly.</p>
+          <div id="permission-steps"></div>
+          <div class="permission-actions">
+            <button id="open-system-preferences" class="btn btn-primary" data-i18n="permissions.openSettings">Open System Preferences</button>
+            <button id="refresh-permission-status" class="btn btn-secondary" data-i18n="permissions.refresh">Refresh Status</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Compliance Consent Modal -->
+    <div id="consent-modal" class="modal hidden" role="dialog" aria-labelledby="consent-modal-title">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 id="consent-modal-title" data-i18n="consent.title">Before we begin</h3>
+        </div>
+        <div class="modal-body">
+          <p class="modal-intro" data-i18n="consent.description">
+            WebWork Tracker captures screenshots, activity metrics, and location data during work hours. Please review and accept to continue.
+          </p>
+          <ul class="consent-list">
+            <li data-i18n="consent.screenshots">Screenshots of your primary display may be taken while tracking.</li>
+            <li data-i18n="consent.activity">Keyboard and mouse activity counts are recorded—never full keystrokes.</li>
+            <li data-i18n="consent.location">Location tracking occurs only during active sessions (if enabled by your organization).</li>
+          </ul>
+          <p class="modal-links" data-i18n="consent.links">
+            Review our <a href="/privacy-policy" target="_blank" rel="noreferrer">Privacy Policy</a> and <a href="/terms-of-service" target="_blank" rel="noreferrer">Terms of Service</a>.
+          </p>
+          <label class="consent-checkbox">
+            <input type="checkbox" id="consent-checkbox" />
+            <span data-i18n="consent.acknowledge">I understand and agree to the monitoring described above.</span>
+          </label>
+        </div>
+        <div class="modal-footer">
+          <button id="consent-decline" class="btn btn-secondary" data-i18n="consent.decline">Decline</button>
+          <button id="consent-accept" class="btn btn-primary" data-i18n="consent.accept" disabled>Accept & Continue</button>
         </div>
       </div>
     </div>
