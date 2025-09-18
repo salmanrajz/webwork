@@ -10,6 +10,11 @@ import Shift from './Shift.js';
 import Attendance from './Attendance.js';
 import RestrictionRule from './RestrictionRule.js';
 import RestrictionViolation from './RestrictionViolation.js';
+// GPS models will be added when database is set up
+// import GpsPoint from './GpsPoint.js';
+// import Geofence from './Geofence.js';
+// import GeoEvent from './GeoEvent.js';
+// import OrganizationSettings from './OrganizationSettings.js';
 
 // Associations
 Team.belongsTo(User, { as: 'manager', foreignKey: 'managerId' });
@@ -83,6 +88,8 @@ User.hasMany(RestrictionViolation, { as: 'acknowledgedViolations', foreignKey: '
 
 RestrictionViolation.belongsTo(User, { as: 'overrideByUser', foreignKey: 'overrideBy' });
 User.hasMany(RestrictionViolation, { as: 'overrideViolations', foreignKey: 'overrideBy' });
+
+// GPS associations will be added when models are properly set up
 
 export {
   User,

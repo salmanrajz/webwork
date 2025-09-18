@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('desktop', {
    clockIn: (payload) => ipcRenderer.invoke('attendance:clockIn', payload),
    clockOut: (payload) => ipcRenderer.invoke('attendance:clockOut', payload),
   getActiveAttendance: (payload) => ipcRenderer.invoke('attendance:active', payload),
+  sendGpsData: (gpsData) => ipcRenderer.invoke('gps:sendData', gpsData),
   logout: () => ipcRenderer.send('tracker:logout'),
   onStatus: (callback) => ipcRenderer.on('tracker:status', (_event, data) => callback(data))
 });

@@ -837,7 +837,14 @@ const createWindow = () => {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
-      contextIsolation: true
+      contextIsolation: true,
+      enableRemoteModule: false,
+      allowRunningInsecureContent: false,
+      experimentalFeatures: false,
+      // Enable location services
+      webSecurity: false,
+      // Allow geolocation
+      partition: 'persist:webwork-tracker'
     }
   });
 
@@ -850,8 +857,36 @@ const createWindow = () => {
   });
 
   mainWindow.removeMenu();
+  
+  // Handle permission requests
+  mainWindow.webContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
+    console.log('🔐 Permission requested:', permission);
+    if (permission === 'geolocation') {
+      console.log('✅ Allowing geolocation permission');
+      callback(true);
+    } else {
+      callback(false);
+    }
+  });
+  
+  // Set permission check handler
+  mainWindow.webContents.session.setPermissionCheckHandler((webContents, permission, requestingOrigin, details) => {
+    console.log('🔍 Permission check:', permission);
+    if (permission === 'geolocation') {
+      console.log('✅ Geolocation permission granted');
+      return true;
+    }
+    return false;
+  });
+  
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 };
+
+// Check if app is available (running in Electron context)
+if (!app) {
+  console.error('❌ Electron app object not available. Make sure to run with: npm start');
+  process.exit(1);
+}
 
 app.whenReady().then(async () => {
   // Check macOS permissions on startup
@@ -901,6 +936,36 @@ app.on('before-quit', () => {
 ipcMain.handle('auth:login', async (_event, credentials) => {
   const { data } = await api.post('/auth/login', credentials);
   return data.data;
+});
+
+// GPS data handler
+ipcMain.handle('gps:sendData', async (_event, gpsData) => {
+  try {
+    if (ENABLE_CONSOLE_LOGS) {
+      console.log('📍 GPS data received:', gpsData.latitude, gpsData.longitude);
+    }
+
+    // Send GPS data to backend
+    const response = await api.post('/gps/points', {
+      points: [gpsData],
+      sessionId: gpsData.sessionId
+    }, {
+      headers: {
+        'Authorization': `Bearer ${gpsData.token || activityContext?.token}`
+      }
+    });
+
+    if (ENABLE_CONSOLE_LOGS) {
+      console.log('✅ GPS data sent to backend');
+    }
+
+    return { success: true };
+  } catch (error) {
+    if (ENABLE_CONSOLE_LOGS) {
+      console.warn('⚠️ Failed to send GPS data:', error.message);
+    }
+    return { success: false, error: error.message };
+  }
 });
 
 ipcMain.handle('tasks:list', async (_event, { token, assigneeId }) => {

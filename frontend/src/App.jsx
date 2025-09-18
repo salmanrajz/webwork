@@ -14,6 +14,7 @@ import AssignTasksPage from './pages/AssignTasksPage.jsx';
 import RestrictionManagement from './pages/RestrictionManagement.jsx';
 import NotificationTestPage from './pages/NotificationTestPage.jsx';
 import NotificationManagement from './pages/NotificationManagement.jsx';
+import GpsDashboard from './pages/GpsDashboard.jsx';
 import { useAuth } from './context/AuthContext.jsx';
 import { ThemeProvider } from './context/ThemeContext.jsx';
 
@@ -137,6 +138,14 @@ const App = () => (
         element={
           <ProtectedRoute>
             <NotificationManagement />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/gps"
+        element={
+          <ProtectedRoute>
+            <GpsDashboard />
           </ProtectedRoute>
         }
       />

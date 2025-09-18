@@ -51,7 +51,14 @@ const state = {
     dailyTarget: 8
   },
   notifications: [],
-  isConnected: false
+  isConnected: false,
+  gps: {
+    enabled: false,
+    permission: 'prompt', // 'granted', 'denied', 'prompt'
+    lastLocation: null,
+    watchId: null,
+    isTracking: false
+  }
 };
 
 const setStatus = (text, note = '') => {
@@ -342,7 +349,29 @@ startBtn.addEventListener('click', async () => {
     setStatus('Running', 'Tracking started.');
     setButtonsState({ running: true });
     logEvent(`Started timer for task ${taskSelect.selectedOptions[0].text}`);
-    
+
+    // 🔍 TEST: GPS Debug Start
+    console.log('🔍 GPS DEBUG: Timer started, checking GPS...');
+    logEvent('🔍 GPS DEBUG: Timer started, checking GPS...');
+
+    // Start GPS tracking if permission is granted
+    logEvent(`GPS permission status: ${state.gps.permission}`);
+    if (state.gps.permission === 'granted') {
+      logEvent('GPS permission already granted, starting tracking');
+      startGpsTracking();
+    } else if (state.gps.permission === 'prompt') {
+      logEvent('Requesting GPS permission...');
+      const granted = await requestGpsPermission();
+      if (granted) {
+        logEvent('GPS permission granted, starting tracking');
+        startGpsTracking();
+      } else {
+        logEvent('GPS permission denied');
+      }
+    } else {
+      logEvent('GPS permission denied, cannot start tracking');
+    }
+
     // Show push notification when starting tracking
     if (Notification.permission === 'granted') {
       new Notification('WebWork Tracker Started', {
@@ -363,7 +392,10 @@ pauseBtn.addEventListener('click', async () => {
     setStatus('Paused', 'Timer paused.');
     setButtonsState({ running: false });
     logEvent('Timer paused.');
-    
+
+    // Stop GPS tracking when pausing
+    stopGpsTracking();
+
     // Show push notification when pausing
     if (Notification.permission === 'granted') {
       new Notification('WebWork Tracker Paused', {
@@ -386,7 +418,12 @@ resumeBtn.addEventListener('click', async () => {
     setStatus('Running', 'Timer resumed.');
     setButtonsState({ running: true });
     logEvent('Timer resumed.');
-    
+
+    // Resume GPS tracking if permission is granted
+    if (state.gps.permission === 'granted') {
+      startGpsTracking();
+    }
+
     // Show push notification when resuming
     if (Notification.permission === 'granted') {
       new Notification('WebWork Tracker Resumed', {
@@ -408,7 +445,10 @@ stopBtn.addEventListener('click', async () => {
     setStatus('Idle', 'Timer stopped.');
     setButtonsState({ running: false });
     logEvent('Timer stopped.');
-    
+
+    // Stop GPS tracking when stopping
+    stopGpsTracking();
+
     // Show push notification when stopping
     if (Notification.permission === 'granted') {
       new Notification('WebWork Tracker Stopped', {
@@ -689,6 +729,191 @@ restoreSession();
 
 // Request notification permission on startup
 requestNotificationPermission();
+
+// GPS Functions
+const checkGpsPermission = () => {
+  if (!navigator.geolocation) {
+    state.gps.permission = 'denied';
+    return false;
+  }
+  return true;
+};
+
+const requestGpsPermission = async () => {
+  logEvent('Checking GPS support...');
+  if (!checkGpsPermission()) {
+    logEvent('GPS not supported on this device');
+    return false;
+  }
+
+  logEvent('Requesting location permission...');
+  
+  // First check if permission is already granted
+  if (navigator.permissions) {
+    try {
+      const permission = await navigator.permissions.query({ name: 'geolocation' });
+      logEvent(`GPS permission state: ${permission.state}`);
+      
+      if (permission.state === 'denied') {
+        state.gps.permission = 'denied';
+        logEvent('GPS permission denied by user');
+        return false;
+      }
+    } catch (permError) {
+      logEvent(`Permission check failed: ${permError.message}`);
+    }
+  }
+  
+  try {
+    logEvent('Attempting to get location...');
+    const position = await new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        enableHighAccuracy: false, // Try less accurate first
+        timeout: 15000,
+        maximumAge: 300000 // Allow cached location up to 5 minutes
+      });
+    });
+    
+    logEvent(`Location obtained: ${position.coords.latitude}, ${position.coords.longitude}`);
+
+    state.gps.permission = 'granted';
+    state.gps.lastLocation = {
+      latitude: position.coords.latitude,
+      longitude: position.coords.longitude,
+      accuracy: position.coords.accuracy,
+      timestamp: new Date().toISOString()
+    };
+
+    logEvent(`GPS permission granted - Location: ${position.coords.latitude}, ${position.coords.longitude}`);
+    return true;
+  } catch (error) {
+    logEvent(`First location attempt failed: ${error.message}`);
+    console.error('GPS Error:', error);
+    
+    // Try fallback with different settings
+    try {
+      logEvent('Trying fallback location method...');
+      const fallbackPosition = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 600000 // Allow cached location up to 10 minutes
+        });
+      });
+      
+      logEvent(`Fallback location obtained: ${fallbackPosition.coords.latitude}, ${fallbackPosition.coords.longitude}`);
+      
+      state.gps.permission = 'granted';
+      state.gps.lastLocation = {
+        latitude: fallbackPosition.coords.latitude,
+        longitude: fallbackPosition.coords.longitude,
+        accuracy: fallbackPosition.coords.accuracy,
+        timestamp: new Date().toISOString()
+      };
+
+      logEvent(`GPS permission granted via fallback - Location: ${fallbackPosition.coords.latitude}, ${fallbackPosition.coords.longitude}`);
+      return true;
+      
+    } catch (fallbackError) {
+      state.gps.permission = 'denied';
+      logEvent(`GPS permission denied: ${fallbackError.message}`);
+      console.error('GPS Fallback Error:', fallbackError);
+      
+      // Try to provide more helpful error messages
+      if (fallbackError.code === 1) {
+        logEvent('GPS Error: Permission denied by user');
+      } else if (fallbackError.code === 2) {
+        logEvent('GPS Error: Position unavailable - Check if location services are enabled');
+      } else if (fallbackError.code === 3) {
+        logEvent('GPS Error: Request timeout - Location services may be slow');
+      }
+      
+      return false;
+    }
+  }
+};
+
+const startGpsTracking = () => {
+  logEvent('Starting GPS tracking...');
+  if (state.gps.permission !== 'granted') {
+    logEvent('GPS permission not granted');
+    return;
+  }
+
+  if (state.gps.watchId) {
+    logEvent('GPS tracking already active');
+    return;
+  }
+
+  state.gps.isTracking = true;
+  logEvent('Setting up GPS watchPosition...');
+  state.gps.watchId = navigator.geolocation.watchPosition(
+    (position) => {
+      const location = {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        accuracy: position.coords.accuracy,
+        speed: position.coords.speed,
+        heading: position.coords.heading,
+        altitude: position.coords.altitude,
+        timestamp: new Date().toISOString()
+      };
+
+      state.gps.lastLocation = location;
+      
+      logEvent(`GPS position received: ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`);
+      
+      // Send GPS data to main process
+      if (window.desktop && window.desktop.sendGpsData) {
+        logEvent('Sending GPS data to main process...');
+        window.desktop.sendGpsData({
+          ...location,
+          sessionId: state.activeLog?.id,
+          userId: state.user?.id,
+          source: 'desktop',
+          clientOs: navigator.platform,
+          clientApp: 'desktop',
+          token: state.token
+        });
+      } else {
+        logEvent('ERROR: window.desktop.sendGpsData not available');
+      }
+
+      logEvent(`GPS: ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)} (${Math.round(location.accuracy)}m)`);
+    },
+    (error) => {
+      logEvent(`GPS error: ${error.message}`);
+    },
+    {
+      enableHighAccuracy: true,
+      timeout: 30000,
+      maximumAge: 30000
+    }
+  );
+
+  logEvent('GPS tracking started');
+};
+
+const stopGpsTracking = () => {
+  if (state.gps.watchId) {
+    navigator.geolocation.clearWatch(state.gps.watchId);
+    state.gps.watchId = null;
+    state.gps.isTracking = false;
+    logEvent('GPS tracking stopped');
+  }
+};
+
+const getGpsStatus = () => {
+  return {
+    enabled: state.gps.enabled,
+    permission: state.gps.permission,
+    isTracking: state.gps.isTracking,
+    lastLocation: state.gps.lastLocation
+  };
+};
+
+// Initialize GPS on app start
+checkGpsPermission();
 
 // Notification modal event handlers
 const notificationBtn = document.getElementById('notification-btn');
