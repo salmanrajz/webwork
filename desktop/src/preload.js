@@ -12,6 +12,8 @@ contextBridge.exposeInMainWorld('desktop', {
    clockOut: (payload) => ipcRenderer.invoke('attendance:clockOut', payload),
   getActiveAttendance: (payload) => ipcRenderer.invoke('attendance:active', payload),
   sendGpsData: (gpsData) => ipcRenderer.invoke('gps:sendData', gpsData),
+  updateTrayControls: (payload) => ipcRenderer.send('tray:updateControls', payload),
+  onTrayCommand: (callback) => ipcRenderer.on('tray:command', (_event, action) => callback(action)),
   logout: () => ipcRenderer.send('tracker:logout'),
   onStatus: (callback) => ipcRenderer.on('tracker:status', (_event, data) => callback(data)),
   onPermissionStatus: (callback) => ipcRenderer.on('permissions:status', (_event, data) => callback(data)),

@@ -539,11 +539,27 @@ const toggleTracker = (show) => {
 };
 
 const setButtonsState = ({ running }) => {
-  const hasTask = state.tasks.length > 0;
-  startBtn.disabled = running || !hasTask;
-  resumeBtn.disabled = running || !hasTask;
-  pauseBtn.disabled = !running;
-  stopBtn.disabled = !running;
+  const hasTasks = state.tasks.length > 0;
+  const hasSelection = Boolean(taskSelect?.value);
+  const canPause = Boolean(running);
+  const canResume = !running && Boolean(state.activeLog);
+  const canStart = !state.activeLog && hasTasks && hasSelection;
+  const canStop = Boolean(state.activeLog);
+
+  startBtn.disabled = !canStart;
+  resumeBtn.disabled = !canResume;
+  pauseBtn.disabled = !canPause;
+  stopBtn.disabled = !canStop;
+
+  if (window.desktop?.updateTrayControls) {
+    window.desktop.updateTrayControls({
+      canStart,
+      canResume,
+      canPause,
+      canStop,
+      clockLabel: state.attendance ? 'Clock Out' : 'Clock In'
+    });
+  }
 };
 
 const setAttendanceDisplay = () => {
@@ -560,6 +576,8 @@ const setAttendanceDisplay = () => {
     clockToggleBtn.classList.remove('danger');
     clockToggleBtn.classList.add('secondary');
   }
+
+  setButtonsState({ running: Boolean(state.activeLog) });
 };
 
 const populateTasks = () => {
@@ -763,16 +781,15 @@ if (closePermissionModalBtn) {
   });
 }
 
-clockToggleBtn.addEventListener('click', async () => {
-  if (!state.token) return;
+const performClockToggle = async () => {
+  if (!state.token) return false;
   try {
     if (state.attendance) {
       const record = await window.desktop.clockOut({ token: state.token });
       state.attendance = null;
       setAttendanceDisplay();
       logEvent('Clocked out at ' + new Date(record.clockOut).toLocaleTimeString());
-      
-      // Show push notification when clocking out
+
       if (Notification.permission === 'granted') {
         new Notification('WebWork Tracker - Clocked Out', {
           body: `Clocked out at ${new Date(record.clockOut).toLocaleTimeString()}`,
@@ -785,8 +802,7 @@ clockToggleBtn.addEventListener('click', async () => {
       state.attendance = record;
       setAttendanceDisplay();
       logEvent('Clocked in at ' + new Date(record.clockIn).toLocaleTimeString());
-      
-      // Show push notification when clocking in
+
       if (Notification.permission === 'granted') {
         new Notification('WebWork Tracker - Clocked In', {
           body: `Clocked in at ${new Date(record.clockIn).toLocaleTimeString()}`,
@@ -795,28 +811,37 @@ clockToggleBtn.addEventListener('click', async () => {
         });
       }
     }
+
+    setButtonsState({ running: Boolean(state.activeLog) });
+    return true;
   } catch (error) {
     logEvent('Attendance update failed: ' + (error?.response?.data?.message || error.message));
+    return false;
   }
+};
+
+clockToggleBtn.addEventListener('click', () => {
+  performClockToggle();
 });
 
-startBtn.addEventListener('click', async () => {
-  if (!state.token || !taskSelect.value) return;
-  if (!ensureConsentGranted()) return;
+const performStartTracking = async () => {
+  if (!state.token || !taskSelect.value) return false;
+  if (!ensureConsentGranted()) return false;
   try {
     await ensureClockedIn();
     const log = await window.desktop.startTimer({ token: state.token, taskId: taskSelect.value });
     state.activeLog = log;
     setStatus('Running', 'Tracking started.');
+    startTimer(log.startTime);
     setButtonsState({ running: true });
-    logEvent(`Started timer for task ${taskSelect.selectedOptions[0].text}`);
+    const selectedTaskOption = taskSelect.selectedOptions?.[0];
+    const taskLabel = selectedTaskOption ? selectedTaskOption.text : taskSelect.value;
+    logEvent(`Started timer for task ${taskLabel}`);
 
-    // 🔍 TEST: GPS Debug Start
     console.log('🔍 GPS DEBUG: Timer started, checking GPS...');
     logEvent('🔍 GPS DEBUG: Timer started, checking GPS...');
-
-    // Start GPS tracking if permission is granted
     logEvent(`GPS permission status: ${state.gps.permission}`);
+
     if (state.gps.permission === 'granted') {
       logEvent('GPS permission already granted, starting tracking');
       startGpsTracking();
@@ -833,31 +858,29 @@ startBtn.addEventListener('click', async () => {
       logEvent('GPS permission denied, cannot start tracking');
     }
 
-    // Show push notification when starting tracking
     if (Notification.permission === 'granted') {
       new Notification('WebWork Tracker Started', {
-        body: `Started tracking task: ${taskSelect.selectedOptions[0].text}`,
+        body: `Started tracking task: ${taskLabel}`,
         icon: '../build/icon.ico',
         tag: 'tracker-start'
       });
     }
+    return true;
   } catch (error) {
     logEvent('Failed to start timer: ' + (error?.response?.data?.message || error.message));
+    return false;
   }
-});
+};
 
-pauseBtn.addEventListener('click', async () => {
-  if (!state.token) return;
+const performPauseTracking = async () => {
+  if (!state.token) return false;
   try {
     await window.desktop.pauseTimer({ token: state.token });
     setStatus('Paused', 'Timer paused.');
     setButtonsState({ running: false });
     logEvent('Timer paused.');
-
-    // Stop GPS tracking when pausing
     stopGpsTracking();
 
-    // Show push notification when pausing
     if (Notification.permission === 'granted') {
       new Notification('WebWork Tracker Paused', {
         body: 'Timer has been paused',
@@ -865,28 +888,29 @@ pauseBtn.addEventListener('click', async () => {
         tag: 'tracker-pause'
       });
     }
+    return true;
   } catch (error) {
     logEvent('Failed to pause timer: ' + (error?.response?.data?.message || error.message));
+    return false;
   }
-});
+};
 
-resumeBtn.addEventListener('click', async () => {
-  if (!state.token || !taskSelect.value) return;
-  if (!ensureConsentGranted()) return;
+const performResumeTracking = async () => {
+  if (!state.token || !taskSelect.value) return false;
+  if (!ensureConsentGranted()) return false;
   try {
     await ensureClockedIn();
     const log = await window.desktop.resumeTimer({ token: state.token, taskId: taskSelect.value });
     state.activeLog = log;
     setStatus('Running', 'Timer resumed.');
+    startTimer(log.startTime);
     setButtonsState({ running: true });
     logEvent('Timer resumed.');
 
-    // Resume GPS tracking if permission is granted
     if (state.gps.permission === 'granted') {
       startGpsTracking();
     }
 
-    // Show push notification when resuming
     if (Notification.permission === 'granted') {
       new Notification('WebWork Tracker Resumed', {
         body: 'Timer has been resumed',
@@ -894,24 +918,23 @@ resumeBtn.addEventListener('click', async () => {
         tag: 'tracker-resume'
       });
     }
+    return true;
   } catch (error) {
     logEvent('Failed to resume timer: ' + (error?.response?.data?.message || error.message));
+    return false;
   }
-});
+};
 
-stopBtn.addEventListener('click', async () => {
-  if (!state.token) return;
+const performStopTracking = async () => {
+  if (!state.token) return false;
   try {
     await window.desktop.stopTimer({ token: state.token });
     state.activeLog = null;
     setStatus('Idle', 'Timer stopped.');
     setButtonsState({ running: false });
     logEvent('Timer stopped.');
-
-    // Stop GPS tracking when stopping
     stopGpsTracking();
 
-    // Show push notification when stopping
     if (Notification.permission === 'granted') {
       new Notification('WebWork Tracker Stopped', {
         body: 'Timer has been stopped',
@@ -919,10 +942,52 @@ stopBtn.addEventListener('click', async () => {
         tag: 'tracker-stop'
       });
     }
+    return true;
   } catch (error) {
     logEvent('Failed to stop timer: ' + (error?.response?.data?.message || error.message));
+    return false;
   }
+};
+
+startBtn.addEventListener('click', () => {
+  performStartTracking();
 });
+
+pauseBtn.addEventListener('click', () => {
+  performPauseTracking();
+});
+
+resumeBtn.addEventListener('click', () => {
+  performResumeTracking();
+});
+
+stopBtn.addEventListener('click', () => {
+  performStopTracking();
+});
+
+if (window.desktop?.onTrayCommand) {
+  window.desktop.onTrayCommand(async (action) => {
+    switch (action) {
+      case 'start':
+        await performStartTracking();
+        break;
+      case 'pause':
+        await performPauseTracking();
+        break;
+      case 'resume':
+        await performResumeTracking();
+        break;
+      case 'stop':
+        await performStopTracking();
+        break;
+      case 'clock-toggle':
+        await performClockToggle();
+        break;
+      default:
+        break;
+    }
+  });
+}
 
 window.desktop.onStatus((payload) => {
   if (payload.type === 'capture') {

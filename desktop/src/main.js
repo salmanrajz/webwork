@@ -71,6 +71,7 @@ const MACOS_AUTOMATION_REQUIRED = process.env.MACOS_AUTOMATION_REQUIRED !== 'fal
 
 let mainWindow = null;
 let tray = null;
+let trayMenu = null;
 let captureTimer = null;
 let captureContext = null;
 let activityTimer = null;
@@ -782,12 +783,17 @@ const stopTracking = () => {
 
 let cachedPermissionStatus = null;
 
+const FALLBACK_TRAY_ICON_BUFFER = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAARGVYSWZNTQAqAAAACAABh2kABAAAAAEAAAAaAAAAAAADoAEAAwAAAAEAAQAAoAIABAAAAAEAAAAQoAMABAAAAAEAAAAQAAAAADRVcfIAAAHLaVRYdFhNTDpjb20uYWRvYmUueG1wAAAAAAA8eDp4bXBtZXRhIHhtbG5zOng9ImFkb2JlOm5zOm1ldGEvIiB4OnhtcHRrPSJYTVAgQ29yZSA2LjAuMCI+CiAgIDxyZGY6UkRGIHhtbG5zOnJkZj0iaHR0cDovL3d3dy53My5vcmcvMTk5OS8wMi8yMi1yZGYtc3ludGF4LW5zIyI+CiAgICAgIDxyZGY6RGVzY3JpcHRpb24gcmRmOmFib3V0PSIiCiAgICAgICAgICAgIHhtbG5zOmV4aWY9Imh0dHA6Ly9ucy5hZG9iZS5jb20vZXhpZi8xLjAvIj4KICAgICAgICAgPGV4aWY6Q29sb3JTcGFjZT4xPC9leGlmOkNvbG9yU3BhY2U+CiAgICAgICAgIDxleGlmOlBpeGVsWERpbWVuc2lvbj4yNTY8L2V4aWY6UGl4ZWxYRGltZW5zaW9uPgogICAgICAgICA8ZXhpZjpQaXhlbFlEaW1lbnNpb24+MjU2PC9leGlmOlBpeGVsWURpbWVuc2lvbj4KICAgICAgPC9yZGY6RGVzY3JpcHRpb24+CiAgIDwvcmRmOlJERj4KPC94OnhtcG1ldGE+CuYattQAAAG7SURBVDgRrVPNLgRBEK7qGWQlxM86IJad3ZDg6CBx5CaRkPAIQsITCOHoBfxcPACJo4PTct+EOIiLXeIv4SAZG9ZOd6nqtdkZcRBUMj3VX31f1VR1D8AfDUWfTCb7FNGw+BrgNJ/Pn6RSqS7SeoyI+hmO5Ry9DZc3Z8IJWzlBIjGrHGdbAsaYDQaz7K4DYhwRoWjM/kHgHqZBTZeAbjWZ5Za7y2vhu7IwqcCVQB62SV5nGbMxFr+uGHcvDbjDuWIN6MCzoVbmTHAho0TBGYx9l5d2EXOyIwbniohT4xrrXVSxVy5QMAYQcBDS6Rqh2yqiLmeyXyN9bHV73mImkwmEVN+e7C4Q3Dai6pT9G8Au1tXaz63oBLfG6KMbBMsVsYDN97mrgPRokWDpimh+SJVeEr4/I7FIAhkYD+Kpo7f3WYJha7vLXXS5bz0jNe8L7w6usTAucdtCmCi+7/v2dL7g2IRqmIsMfA7bzu3bBF+E1S1RyTZeRaIthPAfu5EZ/FgVIv5PAr6+rpyAPQW+96ECEZf7j1V4/K5eJJ7qOT+bnEFm9OB5nslm5XeIGIFSq1ysjVEErY8j0d9uPgChCKMwHoo5ogAAAABJRU5ErkJggg==',
+  'base64'
+);
+
 // Resolve the correct tray icon for the current platform/build
 const resolveTrayImage = () => {
   const baseDir = app.isPackaged ? process.resourcesPath : path.join(__dirname, '..');
   const buildDir = path.join(baseDir, 'build');
   const candidates = process.platform === 'darwin'
-    ? ['iconTemplate.png', 'icon.png', 'iconTemplate@2x.png', 'icon.ico']
+    ? ['iconTemplate.png', 'icon.png', 'iconTemplate@2x.png']
     : ['icon.ico', 'icon.png'];
 
   for (const fileName of candidates) {
@@ -808,10 +814,22 @@ const resolveTrayImage = () => {
 
     if (process.platform === 'darwin') {
       image = image.resize({ width: 18, height: 18, quality: 'best' });
-      image.setTemplateImage(true);
+      image.setTemplateImage(fileName.toLowerCase().includes('template'));
     }
 
     return { image, path: candidatePath };
+  }
+
+  let fallbackImage = nativeImage.createFromBuffer(FALLBACK_TRAY_ICON_BUFFER);
+  if (!fallbackImage.isEmpty()) {
+    if (process.platform === 'darwin') {
+      fallbackImage = fallbackImage.resize({ width: 18, height: 18, quality: 'best' });
+      // Keep fallbacks full-color so they remain visible in the status bar
+      fallbackImage.setTemplateImage(false);
+    } else {
+      fallbackImage = fallbackImage.resize({ width: 24, height: 24, quality: 'best' });
+    }
+    return { image: fallbackImage, path: 'embedded-tray-icon' };
   }
 
   return null;
@@ -826,7 +844,12 @@ const createTray = () => {
   }
 
   try {
-    tray = new Tray(resolvedIcon.image);
+    if (resolvedIcon.path !== 'embedded-tray-icon') {
+      tray = new Tray(resolvedIcon.path);
+      tray.setImage(resolvedIcon.image);
+    } else {
+      tray = new Tray(resolvedIcon.image);
+    }
     if (ENABLE_CONSOLE_LOGS) {
       console.log('✅ System tray icon loaded from:', resolvedIcon.path);
     }
@@ -842,6 +865,12 @@ const createTray = () => {
     return;
   }
   
+  const sendTrayCommand = (command) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('tray:command', command);
+    }
+  };
+
   const contextMenu = Menu.buildFromTemplate([
     {
       label: 'Show WebWork Tracker',
@@ -862,6 +891,35 @@ const createTray = () => {
     },
     { type: 'separator' },
     {
+      id: 'tray-start',
+      label: 'Start Tracking',
+      accelerator: 'CmdOrCtrl+Shift+S',
+      click: () => sendTrayCommand('start')
+    },
+    {
+      id: 'tray-resume',
+      label: 'Resume Tracking',
+      accelerator: 'CmdOrCtrl+Shift+R',
+      click: () => sendTrayCommand('resume')
+    },
+    {
+      id: 'tray-pause',
+      label: 'Pause Tracking',
+      click: () => sendTrayCommand('pause')
+    },
+    {
+      id: 'tray-stop',
+      label: 'Stop Tracking',
+      click: () => sendTrayCommand('stop')
+    },
+    { type: 'separator' },
+    {
+      id: 'tray-clock-toggle',
+      label: 'Clock In/Out',
+      click: () => sendTrayCommand('clock-toggle')
+    },
+    { type: 'separator' },
+    {
       label: 'Quit',
       click: () => {
         app.isQuiting = true;
@@ -871,6 +929,7 @@ const createTray = () => {
   ]);
   
   tray.setContextMenu(contextMenu);
+  trayMenu = contextMenu;
   tray.setToolTip('WebWork Tracker - Time Tracking');
   
   // Show window when tray icon is clicked
@@ -890,12 +949,10 @@ const createTray = () => {
 
 const createWindow = () => {
   mainWindow = new BrowserWindow({
-    width: 420,
-    height: 640,
-    minWidth: 360,
-    minHeight: 500,
-    maxWidth: 1200,
-    maxHeight: 800,
+    width: 1040,
+    height: 720,
+    minWidth: 960,
+    minHeight: 600,
     resizable: true,
     maximizable: true,
     minimizable: true,
@@ -1168,6 +1225,42 @@ ipcMain.handle('attendance:active', async (_event, { token }) => {
   const client = withAuth(token);
   const { data } = await client.get('/attendance/active');
   return data.data;
+});
+
+ipcMain.on('tray:updateControls', (_event, controls = {}) => {
+  if (!trayMenu) {
+    return;
+  }
+
+  const {
+    canStart = false,
+    canResume = false,
+    canPause = false,
+    canStop = false,
+    clockLabel = 'Clock In/Out'
+  } = controls;
+
+  const updateItem = (id, enabled) => {
+    const item = trayMenu.getMenuItemById(id);
+    if (item) {
+      item.enabled = Boolean(enabled);
+    }
+  };
+
+  updateItem('tray-start', canStart);
+  updateItem('tray-resume', canResume);
+  updateItem('tray-pause', canPause);
+  updateItem('tray-stop', canStop);
+
+  const clockItem = trayMenu.getMenuItemById('tray-clock-toggle');
+  if (clockItem) {
+    clockItem.label = clockLabel;
+    clockItem.enabled = true;
+  }
+
+  if (tray) {
+    tray.setContextMenu(trayMenu);
+  }
 });
 
 ipcMain.on('tracker:logout', () => {
