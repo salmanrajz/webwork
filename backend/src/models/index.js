@@ -8,6 +8,8 @@ import Screenshot from './Screenshot.js';
 import Activity from './Activity.js';
 import Shift from './Shift.js';
 import Attendance from './Attendance.js';
+import RestrictionRule from './RestrictionRule.js';
+import RestrictionViolation from './RestrictionViolation.js';
 
 // Associations
 Team.belongsTo(User, { as: 'manager', foreignKey: 'managerId' });
@@ -60,6 +62,28 @@ User.hasMany(Attendance, { as: 'attendanceRecords', foreignKey: 'userId' });
 Attendance.belongsTo(Shift, { as: 'shift', foreignKey: 'shiftId' });
 Shift.hasMany(Attendance, { as: 'attendanceRecords', foreignKey: 'shiftId' });
 
+// Restriction associations
+RestrictionRule.belongsTo(User, { as: 'creator', foreignKey: 'createdBy' });
+User.hasMany(RestrictionRule, { as: 'createdRules', foreignKey: 'createdBy' });
+
+RestrictionRule.belongsTo(User, { as: 'targetUser', foreignKey: 'targetUserId' });
+User.hasMany(RestrictionRule, { as: 'targetRules', foreignKey: 'targetUserId' });
+
+RestrictionRule.belongsTo(Team, { as: 'targetTeam', foreignKey: 'targetTeamId' });
+Team.hasMany(RestrictionRule, { as: 'teamRules', foreignKey: 'targetTeamId' });
+
+RestrictionViolation.belongsTo(User, { as: 'user', foreignKey: 'userId' });
+User.hasMany(RestrictionViolation, { as: 'violations', foreignKey: 'userId' });
+
+RestrictionViolation.belongsTo(RestrictionRule, { as: 'rule', foreignKey: 'ruleId' });
+RestrictionRule.hasMany(RestrictionViolation, { as: 'violations', foreignKey: 'ruleId' });
+
+RestrictionViolation.belongsTo(User, { as: 'acknowledgedByUser', foreignKey: 'acknowledgedBy' });
+User.hasMany(RestrictionViolation, { as: 'acknowledgedViolations', foreignKey: 'acknowledgedBy' });
+
+RestrictionViolation.belongsTo(User, { as: 'overrideByUser', foreignKey: 'overrideBy' });
+User.hasMany(RestrictionViolation, { as: 'overrideViolations', foreignKey: 'overrideBy' });
+
 export {
   User,
   Team,
@@ -70,5 +94,7 @@ export {
   Screenshot,
   Activity,
   Shift,
-  Attendance
+  Attendance,
+  RestrictionRule,
+  RestrictionViolation
 };

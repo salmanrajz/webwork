@@ -1,0 +1,71 @@
+appId: com.webwork.tracker
+productName: WebWork Tracker
+files:
+  - "src/**/*"
+  - "node_modules/**/*"
+  - "package.json"
+  - "build/**/*"
+asarUnpack:
+  - "node_modules/screenshot-desktop/lib/win32/*.bat"
+  - "node_modules/screenshot-desktop/lib/win32/*.exe"
+  - "node_modules/screenshot-desktop/lib/win32/*.manifest"
+  - "node_modules/screenshot-desktop/lib/darwin/*"
+  - "node_modules/screenshot-desktop/lib/linux/*"
+directories:
+  output: dist
+win:
+  target:
+    - nsis
+    - portable
+  icon: build/icon.ico
+  defaultArch: x64
+  arch:
+    - x64
+  executableName: "WebWork Tracker"
+nsis:
+  oneClick: false
+  perMachine: false
+  allowElevation: true
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: "WebWork Tracker"
+  uninstallDisplayName: "WebWork Tracker"
+  installerIcon: "build/icon.ico"
+  uninstallerIcon: "build/icon.ico"
+portable:
+  artifactName: "${productName} Portable-${version}.${ext}"
+mac:
+  target:
+    - dmg
+    - zip
+  icon: build/icon.png
+  category: public.app-category.productivity
+  hardenedRuntime: false
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  minimumSystemVersion: "10.12"
+  electronLanguages:
+    - en
+  buildDependenciesFromSource: false
+  nodeGypRebuild: false
+dmg:
+  title: WebWork Tracker
+  icon: build/icon.png
+  background: build/dmg-background.png
+  contents:
+    - x: 130
+      y: 220
+    - x: 410
+      y: 220
+      type: link
+      path: /Applications
+  window:
+    width: 540
+    height: 380
+extraResources:
+  - from: build
+    to: build
+  - from: .env
+    to: .env

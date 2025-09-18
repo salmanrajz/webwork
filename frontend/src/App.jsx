@@ -11,6 +11,7 @@ import UsersPage from './pages/UsersPage.jsx';
 import UserFormPage from './pages/UserFormPage.jsx';
 import TasksPage from './pages/TasksPage.jsx';
 import AssignTasksPage from './pages/AssignTasksPage.jsx';
+import RestrictionManagement from './pages/RestrictionManagement.jsx';
 import { useAuth } from './context/AuthContext.jsx';
 import { ThemeProvider } from './context/ThemeContext.jsx';
 
@@ -110,6 +111,14 @@ const App = () => (
         element={
           <ProtectedRoute>
             <TimesheetPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/restrictions"
+        element={
+          <ProtectedRoute>
+            <RestrictionManagement />
           </ProtectedRoute>
         }
       />

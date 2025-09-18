@@ -25,31 +25,13 @@
             <h2 id="user-name"></h2>
             <p id="user-role"></p>
           </div>
-          <div class="header-controls">
-            <button id="analytics-btn" class="analytics-btn" title="View Analytics">
-              📊
-            </button>
-            <button id="productivity-btn" class="productivity-btn" title="Productivity Insights">
-              🎯
-            </button>
-            <button id="settings-btn" class="settings-btn" title="Break Settings">
-              ⚙️
-            </button>
-            <button id="theme-toggle" class="theme-toggle" title="Toggle dark mode">
-              <span class="theme-icon">🌙</span>
-            </button>
-            <button id="logout">Sign out</button>
-          </div>
+          <button id="logout">Sign out</button>
         </header>
 
         <div class="status-card">
           <p class="label">Current status</p>
           <p id="status" class="value">Idle</p>
           <p id="status-note" class="note"></p>
-          <div id="timer-display" class="timer-display hidden">
-            <p class="label">Elapsed Time</p>
-            <p id="elapsed-time" class="value">00:00:00</p>
-          </div>
         </div>
 
         <div class="attendance-card">
@@ -76,37 +58,6 @@
         <div class="log" id="event-log"></div>
       </section>
     </main>
-
-    <!-- Break Settings Modal -->
-    <div id="break-settings-modal" class="modal hidden">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h3>⚙️ Break Settings</h3>
-          <button id="close-settings" class="close-btn">&times;</button>
-        </div>
-        <div class="modal-body">
-          <div class="setting-group">
-            <label for="break-enabled">
-              <input type="checkbox" id="break-enabled" checked>
-              Enable Break Reminders
-            </label>
-          </div>
-          <div class="setting-group">
-            <label for="break-interval">Break Reminder Interval (minutes):</label>
-            <input type="number" id="break-interval" min="15" max="180" value="60">
-          </div>
-          <div class="setting-group">
-            <label for="daily-target">Daily Target Hours:</label>
-            <input type="number" id="daily-target" min="1" max="24" value="8" step="0.5">
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button id="save-settings" class="btn btn-primary">Save Settings</button>
-          <button id="cancel-settings" class="btn btn-secondary">Cancel</button>
-        </div>
-      </div>
-    </div>
-
     <script src="renderer.js"></script>
   </body>
 </html>

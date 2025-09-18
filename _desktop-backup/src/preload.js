@@ -1,5 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
+const shouldShowLog = (process.env.WEBWORK_SILENCE_LOGS || '').toLowerCase() !== 'true';
+
 contextBridge.exposeInMainWorld('desktop', {
   login: (credentials) => ipcRenderer.invoke('auth:login', credentials),
   listTasks: (payload) => ipcRenderer.invoke('tasks:list', payload),
@@ -12,5 +14,14 @@ contextBridge.exposeInMainWorld('desktop', {
    clockOut: (payload) => ipcRenderer.invoke('attendance:clockOut', payload),
   getActiveAttendance: (payload) => ipcRenderer.invoke('attendance:active', payload),
   logout: () => ipcRenderer.send('tracker:logout'),
-  onStatus: (callback) => ipcRenderer.on('tracker:status', (_event, data) => callback(data))
+  onStatus: (callback) => ipcRenderer.on('tracker:status', (_event, data) => callback(data)),
+  onTrayStart: (callback) => ipcRenderer.on('tray:start-tracking', callback),
+  onTrayStop: (callback) => ipcRenderer.on('tray:stop-tracking', callback),
+  onBreakReminder: (callback) => ipcRenderer.on('break-reminder', callback),
+  getBreakSettings: (token) => ipcRenderer.invoke('break-settings:get', { token }),
+  updateBreakSettings: (token, settings) => ipcRenderer.invoke('break-settings:update', { token, settings })
+});
+
+contextBridge.exposeInMainWorld('desktopConfig', {
+  shouldShowLog
 });

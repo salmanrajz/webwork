@@ -1,10 +1,9 @@
-appId: com.webwork.tracker
+appId: com.yourcompany.webworktracker
 productName: WebWork Tracker
 files:
   - "src/**/*"
   - "node_modules/**/*"
   - "package.json"
-  - "build/**/*"
 directories:
   output: dist
 win:
@@ -12,7 +11,6 @@ win:
     - nsis
     - portable
   icon: build/icon.ico
-  defaultArch: x64
 nsis:
   oneClick: false
   perMachine: false
@@ -20,10 +18,10 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
+  installerLanguages:
+    - en_US
 portable:
   artifactName: "${productName} Portable-${version}.${ext}"
 extraResources:
   - from: build
     to: build
-  - from: .env
-    to: .env

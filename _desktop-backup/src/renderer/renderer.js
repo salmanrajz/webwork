@@ -32,10 +32,10 @@ const setStatus = (text, note = '') => {
   statusNote.textContent = note;
 };
 
-const isProduction = false; // Always show logs in development
+const shouldShowLog = process.env.WEBWORK_SILENCE_LOGS !== 'true';
 
 const logEvent = (message) => {
-  if (isProduction) return;
+  if (!shouldShowLog) return;
   const entry = document.createElement('div');
   entry.className = 'log-entry';
   const timeEl = document.createElement('time');
@@ -171,8 +171,14 @@ loginForm.addEventListener('submit', async (event) => {
     await loadAttendance();
     logEvent('Signed in successfully.');
   } catch (error) {
-    console.error(error);
-    authError.textContent = error?.response?.data?.message || 'Unable to sign in.';
+    const message =
+      error?.response?.data?.message ||
+      error?.data?.message ||
+      error?.message ||
+      'Unable to sign in. Please try again.';
+    console.error('Login failed:', error);
+    logEvent('Login failed: ' + message);
+    authError.textContent = message;
     authError.classList.remove('hidden');
   }
 });

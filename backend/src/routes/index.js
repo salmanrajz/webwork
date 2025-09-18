@@ -12,6 +12,7 @@ import activityRoutes from './activityRoutes.js';
 import attendanceRoutes from './attendanceRoutes.js';
 import shiftRoutes from './shiftRoutes.js';
 import realtimeRoutes from './realtimeRoutes.js';
+import restrictionRoutes from './restrictionRoutes.js';
 
 const router = Router();
 
@@ -28,5 +29,6 @@ router.use('/activities', activityRoutes);
 router.use('/attendance', attendanceRoutes);
 router.use('/shifts', shiftRoutes);
 router.use('/realtime', realtimeRoutes);
+router.use('/restrictions', restrictionRoutes);
 
 export default router;

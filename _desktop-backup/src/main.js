@@ -1,5 +1,27 @@
-const { app, BrowserWindow, ipcMain, powerMonitor } = require('electron');
+console.log('🔧 Starting WebWork Tracker Desktop App...');
+
+// Import Electron modules
+let app, BrowserWindow, ipcMain, powerMonitor, Tray, Menu;
+
+try {
+  const electron = require('electron');
+  console.log('Electron module type:', typeof electron);
+  
+  if (typeof electron === 'string') {
+    console.error('❌ CRITICAL ERROR: Electron module returned string instead of API!');
+    console.error('❌ This means Electron is not properly installed or configured');
+    process.exit(1);
+  }
+  
+  ({ app, BrowserWindow, ipcMain, powerMonitor, Tray, Menu } = electron);
+  console.log('✅ Electron modules imported successfully');
+} catch (error) {
+  console.error('❌ CRITICAL ERROR: Failed to import Electron modules:', error);
+  process.exit(1);
+}
+
 const path = require('path');
+const fs = require('fs');
 const axios = require('axios');
 const FormData = require('form-data');
 const screenshotDesktop = require('screenshot-desktop');
@@ -16,7 +38,7 @@ try {
   console.warn('Input hooks disabled:', error.message);
 }
 
-const isProduction = false; // Always show logs in development
+const isProduction = app ? app.isPackaged : false;
 
 if (isProduction) {
   console.log = () => {};
